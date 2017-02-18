@@ -27,6 +27,9 @@ TR1-2:30, room 54-100
 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/scheduler-2017.png?dir=0&filepath=resources%2Fstatic%2Fimg%2Fscheduler-2017.png&oid=9c38ebc90be76b60603943bec0b9769289e6da86&sha=dec89cbe68c8c8eb7bd1a5020da1ec3bfe3a534d)
 
 
+### 整体课程介绍：
+>[请点击：英文介绍及中文翻译](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1/101.md?dir=0&filepath=LEC1%2F101.md&oid=10b8b103df840aac63d52672faa063bf9a7d1453&sha=2fa7e192e9229a20cae87e5011212091cb95a1bb)
+
 ----------
 
 ### 如何开始？
