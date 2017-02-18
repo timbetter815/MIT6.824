@@ -1,7 +1,7 @@
-####本项目主要针对自己对MIT6.824课程学习和翻译的记录，也方便后续其他学习者作为参考。
+#### 本项目主要针对自己对MIT6.824课程学习和翻译的记录，也方便后续其他学习者作为参考。
 有些内容也会记录在博客网址：[https://my.oschina.net/tantexian/blog](https://my.oschina.net/tantexian/blog)
 
-###[MIT6.824网址](http://nil.csail.mit.edu/6.824/2017/)
+### [MIT6.824网址](http://nil.csail.mit.edu/6.824/2017/)
 
 6.824: Distributed Systems
 
