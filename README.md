@@ -30,7 +30,13 @@ TR1-2:30, room 54-100
 ### 入门整体课程介绍（必读）：
 >[请点击：英文介绍及中文翻译](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1%2F101.md&oid=10b8b103df840aac63d52672faa063bf9a7d1453&sha=2fa7e192e9229a20cae87e5011212091cb95a1bb)
 
+
+
+
+
+<br></br>
 ----------
+## 关于代码编写规范：
 
 ### 如何开始？
 * [下载最新版代码](https://git.oschina.net/tantexian/MIT6.824)
