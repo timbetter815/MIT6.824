@@ -8,7 +8,7 @@
 Spring 2017
 TR1-2:30, room 54-100
 
-![](http://note.youdao.com/yws/public/resource/5d27dc77d5ca8a3cb69db9748651e58e/xmlnote/A80C0B96D8F7493DA61A17FBB5DD5938/433515)
+![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/start-index1.png?dir=0&filepath=resources%2Fstatic%2Fimg%2Fstart-index1.png&oid=d46b06da44b6e9b7a4842f25b40d9af2f4eb5b46&sha=b8814ea7f159eb661b26c1bb6f8449c9dbc2874a)
 
 
 6.824是麻省理工学院的、关于分布式系统的编程实验课程。主要包括容错、复制、一致性等内容，总共包括23次课，4次试验及2次考试。
