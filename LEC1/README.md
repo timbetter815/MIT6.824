@@ -1,7 +1,7 @@
-####本次课程学习课程资源
-* [LEC 1: Introduction](http://nil.csail.mit.edu/6.824/2017/notes/l01.txt): ./MIT's_version/101.txt
-* [Preparation: Read MapReduce (2004)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)：./MIT's_version/mapreduce.pdf
-* [Assigned: Lab 1: MapReduce](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)：./MIT's_version/6.824 Lab 1_ MapReduce.html
+####本次课程学习顺序及相应课程资源
+1. [LEC 1: Introduction](http://nil.csail.mit.edu/6.824/2017/notes/l01.txt): ./MIT's_version/101.txt
+2. [Preparation: Read MapReduce (2004)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)：./MIT's_version/mapreduce.pdf
+3. [Assigned: Lab 1: MapReduce](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)：./MIT's_version/6.824 Lab 1_ MapReduce.html
 
 #####注意：
 * 其中MIT提供的原始版本文档资料都归档在目录MIT's_version下面（其中.html文件需要下载到本地使用浏览器正常查看）！
