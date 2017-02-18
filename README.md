@@ -1,7 +1,7 @@
 ####本项目主要针对自己对MIT6.824课程学习和翻译的记录，也方便后续其他学习者作为参考。
 有些内容也会记录在博客网址：[https://my.oschina.net/tantexian/blog](https://my.oschina.net/tantexian/blog)
 
-##[MIT6.824网址](http://nil.csail.mit.edu/6.824/2017/)
+###[MIT6.824网址](http://nil.csail.mit.edu/6.824/2017/)
 
 6.824: Distributed Systems
 
@@ -21,3 +21,11 @@ TR1-2:30, room 54-100
 * Questions：问答。
 * Past Exams：往年考试试卷及答案。
 * 2000 Web Site - 2016 Web Site：2000年-2016年以往6.824课程网址。
+
+##学习入门:
+接下来从[Schedule入口](http://nil.csail.mit.edu/6.824/2015/schedule.html)开始从LEC1-LEC23学习。
+
+
+>联系方式：
+>博客网址：[https://my.oschina.net/tantexian/blog](https://my.oschina.net/tantexian/blog)
+>邮箱：tantexian@qq.com
