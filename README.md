@@ -91,7 +91,7 @@ TR1-2:30, room 54-100
 
 
 ### 开发IDE
-* 开发工具不做统一规定（Idea、Eclipse都可以），建议使用Idea
+* 开发工具不做统一规定（Idea、Eclipse都可以），建议使用Idea按照golang插件
 * 建议使用最新版格式Idea，附下载地址：http://pan.baidu.com/s/1slMkXY1
 * 附Idea属性格式注释文件下载地址：http://pan.baidu.com/s/1hrU3IgW（其中java版本Idea使用zz或者zzz命令来生成注释，golang使用gg或者ggg）
 
