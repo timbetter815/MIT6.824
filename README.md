@@ -23,7 +23,8 @@ TR1-2:30, room 54-100
 * 2000 Web Site - 2016 Web Site：2000年-2016年以往6.824课程网址。
 
 ### 学习入门:
-该课程的学习入口：[Schedule入口](http://nil.csail.mit.edu/6.824/2015/schedule.html)开始学习LEC1-LEC23以及课程学习资料。
+该课程的学习入口：[Schedule入口](http://nil.csail.mit.edu/6.824/2017/schedule.html)开始学习LEC1-LEC23以及课程学习资料。
+![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/scheduler-2017.png?dir=0&filepath=resources%2Fstatic%2Fimg%2Fscheduler-2017.png&oid=d46b06da44b6e9b7a4842f25b40d9af2f4eb5b46&sha=b8814ea7f159eb661b26c1bb6f8449c9dbc2874a)
 
 
 ----------
