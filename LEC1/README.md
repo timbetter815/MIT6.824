@@ -8,6 +8,6 @@
 * 当前目录下与./MIT's_version下面文档对于文件名一致，以.md结尾的文件为对应文档资料的翻译解释（翻译文件并不会全文直译）。
 * 翻译解释文档只会翻译记录文档重点内容，由于作者能力及精力有限，如有错误，请查看目录MIT's_version目录下的原始文档资料，或者作者博客留言或者邮件联系修正，谢谢！
 
->联系方式：
+>*联系方式：*
 >博客网址：[https://my.oschina.net/tantexian/blog](https://my.oschina.net/tantexian/blog)
 >邮箱：tantexian@qq.com

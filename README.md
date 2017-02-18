@@ -26,6 +26,6 @@ TR1-2:30, room 54-100
 接下来从[Schedule入口](http://nil.csail.mit.edu/6.824/2015/schedule.html)开始从LEC1-LEC23学习。
 
 
->联系方式：
+>*联系方式：*
 >博客网址：[https://my.oschina.net/tantexian/blog](https://my.oschina.net/tantexian/blog)
 >邮箱：tantexian@qq.com
