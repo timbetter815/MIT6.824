@@ -38,10 +38,8 @@ TR1-2:30, room 54-100
 > 3. [Assigned: Lab 1: MapReduce](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
 
 
-
-
-* ##### 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程MIT's_version目录下本地查看全部资源！
 ---
+##### PS:如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程MIT's_version目录下本地查看全部资源！
 
 
 <br></br>
