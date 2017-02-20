@@ -2,7 +2,8 @@
 > 1. [LEC 1: Introduction](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1_introduction%2F101.md&oid=b0d1831741f38a5f100a721b7e3cd9a69d709822&sha=b78bf6a66ea41b865876cf6fe0f065602c5e4eb7)
 > 2. [Preparation: Read MapReduce (2004)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)
 > 3. [Assigned: Lab 1: MapReduce](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
-> * 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程MIT's_version目录下本地查看全部资源！
+
+* 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程MIT's_version目录下本地查看全部资源！
 
 #### 对应原始资源所在本地目录及MIT's原始链接：
 > 1. LEC 1: Introduction（项目本地文件路径）：./101.txt
