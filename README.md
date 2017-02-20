@@ -27,11 +27,17 @@ TR1-2:30, room 54-100
 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/scheduler-2017.png?dir=0&filepath=resources%2Fstatic%2Fimg%2Fscheduler-2017.png&oid=9c38ebc90be76b60603943bec0b9769289e6da86&sha=dec89cbe68c8c8eb7bd1a5020da1ec3bfe3a534d)
 
 
-### 入门整体课程介绍（必读）：
->[请点击：英文介绍及中文翻译](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1%2F101.md&oid=10b8b103df840aac63d52672faa063bf9a7d1453&sha=2fa7e192e9229a20cae87e5011212091cb95a1bb)
 
 
+### 入门开始（必读）：
 
+---
+#### 第一次课程学习顺序及相应课程资源:
+> 1. [LEC 1: Introduction](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1_introduction%2F101.md&oid=b0d1831741f38a5f100a721b7e3cd9a69d709822&sha=b78bf6a66ea41b865876cf6fe0f065602c5e4eb7)
+> 2. [Preparation: Read MapReduce (2004)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)
+> 3. [Assigned: Lab 1: MapReduce](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
+> * 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程MIT's_version目录下本地查看全部资源！
+---
 
 
 <br></br>
