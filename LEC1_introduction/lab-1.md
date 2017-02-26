@@ -91,20 +91,19 @@ you will have to write/modify doMap, doReduce, and schedule yourself.
 These are located in common_map.go, common_reduce.go, and schedule.go respectively.
 You will also have to write the map and reduce functions in ../main/wc.go.
 
-----------
-**********
-
-> 6. master发送关闭RPC给对应的workers，然后关闭自己的RPC服务。
-## 在本次课程接下来的练习中：
->> 1.你将不得不需要编写或者修改doMap, doReduce，schedule方法
->> 2. 上述分别在common_map.go, common_reduce.go, and schedule.go文件中。
->> 3. 你需要编写map 和 reduce方法（在../main/wc.go文件中）
-
 You should not need to modify any other files,
 but reading them might be useful in order to understand
 how the other methods fit into the overall architecture of the system.
-> 你不需要更改其他文件，但是阅读它们可与帮你理解其他的方法适应系统的总体架构。
 
-**********
-----------
+> ----------
+> ----------
+>> 6. master发送关闭RPC给对应的workers，然后关闭自己的RPC服务。
+> ## 在本次课程接下来的练习中：
+>>> 1.你将不得不需要编写或者修改doMap, doReduce，schedule方法
+>>> 2. 上述分别在common_map.go, common_reduce.go, and schedule.go文件中。
+>>> 3. 你需要编写map 和 reduce方法（在../main/wc.go文件中）
+
+>> 你不需要更改其他文件，但是阅读它们可与帮你理解其他的方法适应系统的总体架构。
+> ----------
+> ----------
 
