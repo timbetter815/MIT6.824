@@ -41,6 +41,9 @@ TR1-2:30, room 54-100
 ---
 ##### PS:如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程MIT's_version目录下本地查看全部资源！
 
+#### GOPATH环境配置：
+为了能够让6.824代码中能够正确导入对应的源码路径，因此本示例中将源码路径：C:\Users\ASUS\Desktop\dev\GOPATH\src\git.oschina.net\tantexian\MIT6.824\6.824-golabs-2017添加到GOPATH中
+
 
 <br></br>
 ----------
