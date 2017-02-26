@@ -92,6 +92,7 @@ These are located in common_map.go, common_reduce.go, and schedule.go respective
 You will also have to write the map and reduce functions in ../main/wc.go.
 
 ----------
+**********
 
 > 6. master发送关闭RPC给对应的workers，然后关闭自己的RPC服务。
 ## 在本次课程接下来的练习中：
@@ -104,5 +105,6 @@ but reading them might be useful in order to understand
 how the other methods fit into the overall architecture of the system.
 > 你不需要更改其他文件，但是阅读它们可与帮你理解其他的方法适应系统的总体架构。
 
+**********
 ----------
 
