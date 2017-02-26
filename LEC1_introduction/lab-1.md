@@ -99,7 +99,7 @@ how the other methods fit into the overall architecture of the system.
 ----------
 
 > #### 6. master发送关闭RPC给对应的workers，然后关闭自己的RPC服务。
-## 在本次课程接下来的练习中：
+### 在本次课程接下来的练习中：
 >      1. 你将不得不需要编写或者修改doMap, doReduce，schedule方法
 >      2. 上述分别在common_map.go, common_reduce.go, and schedule.go文件中。
 >      3. 你需要编写map 和 reduce方法（在../main/wc.go文件中）
