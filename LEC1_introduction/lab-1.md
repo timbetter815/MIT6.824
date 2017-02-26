@@ -65,12 +65,12 @@ Each worker must be able to read files written by any other worker, as well as t
 doMap()哈希每一个key到对应的中间文件，接着reduce将处理这些key。
 在全部的map任务执行完成之后这里将会有nMap x nReduce文件。每一个文件包含map任务编号及reduce任务编号前缀。
 假若有两个map任务和三个reduce任务，map任务将产生6个中间文件：
-> mrtmp.xxx-0-0
-> mrtmp.xxx-0-1
-> mrtmp.xxx-0-2
-> mrtmp.xxx-1-0
-> mrtmp.xxx-1-1
-> mrtmp.xxx-1-2
+mrtmp.xxx-0-0
+mrtmp.xxx-0-1
+mrtmp.xxx-0-2
+mrtmp.xxx-1-0
+mrtmp.xxx-1-1
+mrtmp.xxx-1-2
 
 
 4. The master next calls doReduce() [common_reduce.go] at least once for each reduce task.
