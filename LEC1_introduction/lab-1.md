@@ -113,3 +113,5 @@ how the other methods fit into the overall architecture of the system.
 1. 从测试代码入手：~/6.824-golabs-2017/src/mapreduce/test_test.go
 2. test_test.go为测试用例代码，其中覆盖了很多场景用例，从TestBasic()测试方法入手，分析跟踪代码。
 3. 更多具体代码逻辑解析，直接在源代码中进行注释，请查看对应源代码注释。
+
+PS：为了debug及理解方便可以先以TestSequentialSingle测试用例入手。
