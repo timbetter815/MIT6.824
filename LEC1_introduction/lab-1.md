@@ -1,7 +1,7 @@
 ### 6.824 Lab 1: MapReduce
 (PS：后续只会对文档重要部分进行翻译)
 
-[原文地址](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
+原文地址：[链接](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
 
 简介
 
