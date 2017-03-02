@@ -31,7 +31,6 @@ _testmain.go
 # external packages folder
 vendor/
 
-.gitignore
 .idea/
 824-mrinput-*.txt
 
