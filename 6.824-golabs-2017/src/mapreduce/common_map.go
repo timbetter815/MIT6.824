@@ -1,7 +1,11 @@
 package mapreduce
 
 import (
+	"encoding/json"
 	"hash/fnv"
+	"io/ioutil"
+	"log"
+	"os"
 )
 
 // doMap manages one map task: it reads one of the input files
@@ -53,6 +57,58 @@ func doMap(
 	//
 	// Remember to close the file after you have written all the values!
 	//
+
+	// 读取inFile文件 2017/3/2 Add by tantexixan
+	inputFile, err := os.Open(inFile)
+	if err != nil {
+		log.Fatal("open input file: ", err)
+	}
+	defer inputFile.Close()
+	fd, err := ioutil.ReadAll(inputFile)
+	// 获取该文件的所有内容，传递给用户mapF函数处理
+	contents := string(fd)
+
+	/*fileName := reduceName(jobName, mapTaskNumber, nReduce)
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Fatal("create reduce file: ", err)
+	}
+
+	keyVals := mapF(fileName, contents)
+	for _, keyVal := range keyVals {
+		enc := json.NewEncoder(file)
+		err := enc.Encode(&keyVal)
+		if err != nil {
+			log.Fatal("write json data to  file: ", err)
+		}
+	}
+
+	file.Close()*/
+
+	for i := 0; i < nReduce; i++ {
+		fileName := reduceName(jobName, mapTaskNumber, i)
+		file, err := os.Create(fileName)
+		if err != nil {
+			log.Fatal("create reduce file: ", err)
+		}
+		file.Close()
+	}
+
+	keyVals := mapF("xxx", contents)
+	for _, keyVal := range keyVals {
+		// 此处ihash(keyVal.Key) % nReduce使得相同的key得内容一定保存在同一个文件中
+		fileName := reduceName(jobName, mapTaskNumber, ihash(keyVal.Key)%nReduce)
+		tmpFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm|os.ModeTemporary)
+		if err != nil {
+			log.Fatal("Open reduce file: ", err)
+		}
+		enc := json.NewEncoder(tmpFile)
+		err = enc.Encode(&keyVal)
+		if err != nil {
+			log.Fatal("write json data to  file: ", err)
+		}
+		tmpFile.Close()
+	}
 }
 
 func ihash(s string) int {
