@@ -50,7 +50,11 @@ func doReduce(
 	// file.Close()
 	//
 
-	// 2017/3/2 Add by tantexixan
+	/**
+	 * @author tantexian(https://my.oschina.net/tantexian/blog)
+	 * @since 2017/3/3
+	 * @params
+	 */
 	kvMap := make(map[string][]string)
 	for i := 0; i < nMap; i++ {
 		intermediateFileName := reduceName(jobName, i, reduceTaskNumber)
@@ -87,6 +91,7 @@ func doReduce(
 	enc := json.NewEncoder(outFileOpen)
 
 	for key, vals := range kvMap {
+		// 此处reduceF接受具有相同key的val数组
 		enc.Encode(KeyValue{key, reduceF(key, vals)})
 	}
 }

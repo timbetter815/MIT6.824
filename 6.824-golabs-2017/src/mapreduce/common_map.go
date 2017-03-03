@@ -58,10 +58,14 @@ func doMap(
 	// Remember to close the file after you have written all the values!
 	//
 
-	// 读取inFile文件 2017/3/2 Add by tantexixan
+	/**
+	 * @author tantexian(https://my.oschina.net/tantexian/blog)
+	 * @since 2017/3/3
+	 * @params
+	 */
 	inputFile, err := os.Open(inFile)
 	if err != nil {
-		log.Fatal("open input file: ", err)
+		log.Fatal("open inFile: ", err)
 	}
 	defer inputFile.Close()
 	fd, err := ioutil.ReadAll(inputFile)
@@ -94,7 +98,7 @@ func doMap(
 		file.Close()
 	}
 
-	keyVals := mapF("xxx", contents)
+	keyVals := mapF("unuserd-mapF-filename", contents)
 	for _, keyVal := range keyVals {
 		// 此处ihash(keyVal.Key) % nReduce使得相同的key得内容一定保存在同一个文件中
 		fileName := reduceName(jobName, mapTaskNumber, ihash(keyVal.Key)%nReduce)

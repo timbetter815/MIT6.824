@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"mapreduce"
 	"os"
+	"strings"
+	"strconv"
 )
 
 //
@@ -13,8 +15,19 @@ import (
 // and look only at the contents argument. The return value is a slice
 // of key/value pairs.
 //
+/**
+ * @author tantexian(https://my.oschina.net/tantexian/blog)
+ * @since 2017/3/3
+ * @params
+ */
 func mapF(filename string, contents string) []mapreduce.KeyValue {
 	// TODO: you have to write this function
+	words := strings.Fields(contents)
+	keyVals := []mapreduce.KeyValue{}
+	for _, word := range words {
+		keyVals = append(keyVals, mapreduce.KeyValue{word, "1"})
+	}
+	return keyVals
 }
 
 //
@@ -22,8 +35,15 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 // map tasks, with a list of all the values created for that key by
 // any map task.
 //
+/**
+ * @author tantexian(https://my.oschina.net/tantexian/blog)
+ * @since 2017/3/3
+ * @params
+ */
 func reduceF(key string, values []string) string {
 	// TODO: you also have to write this function
+	// 此处计算得出同一个key对于的values数组长度
+	return strconv.Itoa(len(values))
 }
 
 // Can be run in 3 ways:
