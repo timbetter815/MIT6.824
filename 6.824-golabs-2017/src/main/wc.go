@@ -42,7 +42,7 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
  */
 func reduceF(key string, values []string) string {
 	// TODO: you also have to write this function
-	// 此处计算得出同一个key对于的values数组长度
+	// 此处计算得出同一个key对于的values数组长度（计算每一个单词出现的次数）
 	return strconv.Itoa(len(values))
 }
 
