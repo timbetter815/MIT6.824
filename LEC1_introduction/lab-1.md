@@ -114,13 +114,11 @@ how the other methods fit into the overall architecture of the system.
 ---
 ##### 设置linux环境下gopath（windows类似）：
 vim ~.bash_profile
-`
-export GOROOT=/home/go
-export PATH=$GOROOT/bin:$PATH
-export GOPATH=/home/gopath:/home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017
-alias cdgo='cd /home/gopath/src'
-alias cdmit='cd /home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017/src'
-`
+>      export GOROOT=/home/go
+>      export PATH=$GOROOT/bin:$PATH
+>      export GOPATH=/home/gopath:/home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017
+>      alias cdgo='cd /home/gopath/src'
+>      alias cdmit='cd /home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017/src'
 ---
 
 Part 1：
