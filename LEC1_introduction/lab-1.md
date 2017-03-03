@@ -110,6 +110,19 @@ how the other methods fit into the overall architecture of the system.
 
 ## 接下来开始lab1：
 ### 首先下载源代码[git仓库地址](git://g.csail.mit.edu/6.824-golabs-2017 6.824)，且配置好该源代码src路径到GOPATH中。
+
+---
+##### 设置linux环境下gopath（windows类似）：
+vim ~.bash_profile
+`
+export GOROOT=/home/go
+export PATH=$GOROOT/bin:$PATH
+export GOPATH=/home/gopath:/home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017
+alias cdgo='cd /home/gopath/src'
+alias cdmit='cd /home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017/src'
+`
+---
+
 Part 1：
 1. 从测试代码入手：~/6.824-golabs-2017/src/mapreduce/test_test.go
 2. test_test.go为测试用例代码，其中覆盖了很多场景用例，TestSequentialSingle()测试方法入手，分析跟踪代码。
