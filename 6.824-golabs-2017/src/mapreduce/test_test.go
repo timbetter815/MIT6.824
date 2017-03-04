@@ -132,7 +132,9 @@ func port(suffix string) string {
 func setup() *Master {
 	// 模拟创建100个input文件，其中第一个文件中保存数字1-999，第二个为1000-1999，第三个2000-29999，依此类推
 	files := makeInputs(nMap)
+	// 构建一个UNIX-domain socket
 	master := port("master")
+	// 分布式调度map及reduce任务到那些通过rpc注册到master的worker上
 	mr := Distributed("test", files, nReduce, master)
 	return mr
 }

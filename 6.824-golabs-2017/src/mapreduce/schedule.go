@@ -15,9 +15,11 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	var ntasks int
 	var n_other int // number of inputs (for reduce) or outputs (for map)
 	switch phase {
+	// map阶段
 	case mapPhase:
 		ntasks = len(mapFiles)
 		n_other = nReduce
+	// reduce阶段
 	case reducePhase:
 		ntasks = nReduce
 		n_other = len(mapFiles)
@@ -31,6 +33,14 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	// multiple tasks.
 	//
 	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-	//
+	/**
+	 * @author tantexian<my.oschina.net/tantexian>
+	 * @since 2017/3/4
+	 * @params
+	 */
+	for _, fileName := range mapFiles {
+		call(registerChan, "Worker.DoTask", DoTaskArgs{"jobname", fileName, ntasks, phase, n_other}, nil)
+	}
+
 	fmt.Printf("Schedule: %v phase done\n", phase)
 }

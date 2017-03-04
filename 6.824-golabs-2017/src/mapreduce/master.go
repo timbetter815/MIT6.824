@@ -106,16 +106,28 @@ func (mr *Master) forwardRegistrations(ch chan string) {
 // Distributed schedules map and reduce tasks on workers that register with the
 // master over RPC.
 func Distributed(jobName string, files []string, nreduce int, master string) (mr *Master) {
+	// 创建一个Map/Reduce Master(初始化master参数变量值：包括address、以及加锁等相关参数值)
 	mr = newMaster(master)
+	// 启动master的rpceserver服务（启动期间可以接受其他客户端来向master注册）
 	mr.startRPCServer()
+
+	// 执行mapreduce任务
 	go mr.run(jobName, files, nreduce,
 		func(phase jobPhase) {
+			// 此处为schedule逻辑
+			// 定义一个chan
 			ch := make(chan string)
+			// 启动线程轮训发送已有的及新注册的worker的address到通道chan中
+			// （这样schedule通过读取chan来感知所有的work）
 			go mr.forwardRegistrations(ch)
+			// 调用自定义schedule来处理mapreduce任务
 			schedule(mr.jobName, mr.files, mr.nReduce, phase, ch)
 		},
 		func() {
+			// 此处为finish逻辑
+			// 通过向所有worker发送Shutdown RPC命令来让work关闭
 			mr.stats = mr.killWorkers()
+			// 停止master的rpcserver服务
 			mr.stopRPCServer()
 		})
 	return

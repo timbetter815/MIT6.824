@@ -174,7 +174,7 @@ vim ~.bash_profile
 1. 在这部分实验中，你将会完成另外一个版本的MapReduce,将工作分散到一系列的工作线程，为了充分利用多核的作用。
 虽然工作不是分布在真正的多机上面，不过你的实现可以使用RPC和Channel来模拟一个真正的分布式实现。
 2. mapreduce/master.go，主要管理mapreduce任务；mapreduce/common_rpc.go处理rpc
-3. 本次实验即实现mapreduce/schedule.go#schedule()函数。master将会调用两次schedule()（Map时期即reduce时期）
+3. 本次实验即实现mapreduce/schedule.go#schedule()函数。master将会调用两次schedule()（Map时期和reduce时期）
 4. schedule()的主要目的是：分发任务到可用的works。通常情况下，任务数远远多于worker线程，因此master将会每次分配一个任务给这些works。
 schedule()必须等到所有的任务完成，才能够返回。
 6. schedule()通过读取registerChan参数来感知workers，channel为每个workers产生一个字符串（包含channel的address）。
