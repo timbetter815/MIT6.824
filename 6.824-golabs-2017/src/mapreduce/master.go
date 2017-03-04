@@ -115,9 +115,9 @@ func Distributed(jobName string, files []string, nreduce int, master string) (mr
 	go mr.run(jobName, files, nreduce,
 		func(phase jobPhase) {
 			// 此处为schedule逻辑
-			// 定义一个chan
+			// 定义一个chan通道
 			ch := make(chan string)
-			// 启动线程轮训发送已有的及新注册的worker的address到通道chan中
+			// 启动线程轮循发送已有的及新注册的worker的address到通道chan中
 			// （这样schedule通过读取chan来感知所有的work）
 			go mr.forwardRegistrations(ch)
 			// 调用自定义schedule来处理mapreduce任务

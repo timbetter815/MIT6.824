@@ -1,6 +1,10 @@
 package mapreduce
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+	"log"
+)
 
 //
 // schedule() starts and waits for all tasks in the given phase (Map
@@ -38,9 +42,36 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	 * @since 2017/3/4
 	 * @params
 	 */
-	for _, fileName := range mapFiles {
-		call(registerChan, "Worker.DoTask", DoTaskArgs{"jobname", fileName, ntasks, phase, n_other}, nil)
+	var idleWorker string
+	var wg sync.WaitGroup
+
+	for i, fileName := range mapFiles {
+		wg.Add(1)
+		log.Printf("1----####idleWorker==%v,i==%v, fileName==%v", idleWorker, i, fileName)
+
+		go func() {
+			StartCall:
+			// 获取空闲worker
+			idleWorker = <-registerChan
+			// 函数退出时候执行
+			defer wg.Add(-1)
+			// 根据net/rpc[Go官方库RPC开发指南:https://my.oschina.net/tantexian/blog/851914]
+			// 可知 此处rpc调用Worker结构体的DoTask方法
+			log.Printf("####idleWorker==%v,i==%v, fileName==%v", idleWorker, i, fileName)
+			success := call(idleWorker, "Worker.DoTask", DoTaskArgs{jobName, fileName, phase, i, n_other}, nil)
+			if success == true {
+				// 执行成功则继续放入到空闲worker池中
+				registerChan <- idleWorker
+			} else {
+				fmt.Printf("Master: RPC %s DoTask error\n", idleWorker)
+				// 执行失败则重新执行
+				goto StartCall
+			}
+
+		}()
 	}
 
+	// 一直等到wg为0
+	wg.Wait()
 	fmt.Printf("Schedule: %v phase done\n", phase)
 }

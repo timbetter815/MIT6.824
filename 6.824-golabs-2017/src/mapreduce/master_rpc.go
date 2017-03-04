@@ -30,14 +30,16 @@ func (mr *Master) startRPCServer() {
 
 	// now that we are listening on the master address, can fork off
 	// accepting connections to another thread.
-	go func() {
+	go func() { // 启动线程轮询shutdown通道，直到收到shuntdown退出，否则一直循环接受注册
 	loop:
 		for {
 			select {
-			case <-mr.shutdown:
+			case <-mr.shutdown:// 收到shuntdown退出
 				break loop
 			default:
 			}
+			// Accept用来处理一个监听器，一直在监听客户端的连接，
+			// 一旦监听器接收了一个连接，则还是交给 ServeConn 在另外一个goroutine中去处理
 			conn, err := mr.l.Accept()
 			if err == nil {
 				go func() {
