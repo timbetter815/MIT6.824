@@ -121,8 +121,50 @@ vim ~.bash_profile
 >      alias cdmit='cd /home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017/src'
 ---
 
-Part 1：
+### Part 1：Map/Reduce输入及输出
 1. 从测试代码入手：~/6.824-golabs-2017/src/mapreduce/test_test.go
 2. test_test.go为测试用例代码，其中覆盖了很多场景用例，TestSequentialSingle()测试方法入手，分析跟踪代码。
 3. 更多具体代码逻辑解析，直接在源代码中进行注释，请查看对应源代码注释。
 
+本次需要完成代码：
+1. 将输出分割成map任务的函数和为reduce任务收集全部输入的函数。
+2. 实现common_map.go里面的doMap函数和common_reduce.go里面的doReduce函数。
+
+测试：
+>      cd "$GOPATH/src/mapreduce"
+>      go test -run Sequential
+
+分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+>      common_map.go#domap():（本次test中mapF（）进行了单词分割统计）
+1. 根据input file使用utilio将该文件的内容全部读取出来保存到contents
+2. 调用mapF将文件内容contents分割为一个个单词，然后返回一个keyval数组（其中key为该单词，value为单词出现的次数（默认都有出现1次））
+3. 根据nreduce的参数值，创建对应的文件数量的中间输出文件
+4. 为了保证相同的key对应的keyval值保存到同一个文件中（方便后续doReduce任务统计相同key出现次数）
+5. 步骤4中使用对相同的key值使用hash取模%nreduce来达到相同key保存到同一个文件中
+
+>      common_reduce.go#doReduce():（本次test中reduceF（）直接返回空）
+1. 将nreduce个中间文件（domap步骤生成），内容读取出来
+2. 将1中读取内容统计到一个keyval的map中，其中map的key为单词word，value为对应出现的次数数组
+3. 将keyval的map中的每个项（一次处理一个key），调用reduceF（）函数处理
+4. 其中reduceF（）函数将具有相同key的数组进行计算，计算出当前key的单词出现过多少次
+5. 将4中对每一个单词出现多少次的计算结果保存到一个输出文件中
+
+
+### Part 2：Single-worker单词统计
+1. 从代码main/wc.go入手
+2. 在linux上执行go run wc.go master sequential pg-*.txt
+3. 完成代码之后，将得到统计完成所有word出现次数的输出文件
+
+
+本次需要完成代码：
+1. main/wc.go#mapF()（实现可以参考part1中的mapFunc）
+2. main/wc.go#reduceF()（实现可以参考part1中的reduceFunc）
+
+测试：
+>      cd "$GOPATH/src/main"
+>      go run wc.go master sequential pg-*.txt
+
+
+分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+1. main/wc.go#mapF()（实现可以参考part1中的mapFunc）：根据传入的文件内容，将之分割为一个个单词，然后范围key为单词，value为单词出现次数的keyval数组
+2. main/wc.go#reduceF()：根据传入进来的keyval数组，返回当前word出现的次数
