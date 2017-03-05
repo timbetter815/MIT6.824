@@ -166,6 +166,7 @@ func TestBasic(t *testing.T) {
 	// 模拟创建100个input文件，且创建UNIX-domain socket文件（/var/tmp/824--1/mr8464-master）
 	// 并启动Distributed mapreduce任务
 	mr := setup()
+	// 启动worker向master注册
 	for i := 0; i < 2; i++ {
 		go RunWorker(mr.address, port("worker"+strconv.Itoa(i)),
 			MapFunc, ReduceFunc, -1)

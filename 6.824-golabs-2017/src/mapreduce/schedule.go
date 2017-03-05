@@ -3,7 +3,6 @@ package mapreduce
 import (
 	"fmt"
 	"sync"
-	"log"
 )
 
 //
@@ -34,7 +33,7 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	// All ntasks tasks have to be scheduled on workers, and only once all of
 	// them have been completed successfully should the function return.
 	// Remember that workers may fail, and that any given worker may finish
-	// multiple tasks.
+// multiple tasks.
 	//
 	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 	/**
@@ -42,33 +41,35 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	 * @since 2017/3/4
 	 * @params
 	 */
-	var idleWorker string
+
 	var wg sync.WaitGroup
 
-	for i, fileName := range mapFiles {
+	// 如果为map阶段，则循环获取mapfile文件，如果为reduce阶段，则循环nreduce次数
+	for i := 0; i < ntasks; i++ {
 		wg.Add(1)
-		log.Printf("1----####idleWorker==%v,i==%v, fileName==%v", idleWorker, i, fileName)
 
-		go func() {
-			StartCall:
-			// 获取空闲worker
-			idleWorker = <-registerChan
+		go func(index int) {
+			STARTRPC:
 			// 函数退出时候执行
-			defer wg.Add(-1)
+			defer wg.Done()
+			// 获取空闲worker
+			idleWorker := <-registerChan
+
 			// 根据net/rpc[Go官方库RPC开发指南:https://my.oschina.net/tantexian/blog/851914]
 			// 可知 此处rpc调用Worker结构体的DoTask方法
-			log.Printf("####idleWorker==%v,i==%v, fileName==%v", idleWorker, i, fileName)
-			success := call(idleWorker, "Worker.DoTask", DoTaskArgs{jobName, fileName, phase, i, n_other}, nil)
+			success := call(idleWorker, "Worker.DoTask", DoTaskArgs{jobName, mapFiles[index], phase, index, n_other}, nil)
 			if success == true {
-				// 执行成功则继续放入到空闲worker池中
-				registerChan <- idleWorker
+				// 执行成功则将worker继续放入到空闲worker池中
+				go func() {// 因为任何对通道发送信息及获取信息都是阻塞的，因此需要使用goroutine
+					registerChan <- idleWorker
+				}()
 			} else {
 				fmt.Printf("Master: RPC %s DoTask error\n", idleWorker)
 				// 执行失败则重新执行
-				goto StartCall
+				goto STARTRPC
 			}
 
-		}()
+		}(i)
 	}
 
 	// 一直等到wg为0
