@@ -141,7 +141,6 @@ vim ~.bash_profile
 3. 根据nreduce的参数值，创建对应的文件数量的中间输出文件
 4. 为了保证相同的key对应的keyval值保存到同一个文件中（方便后续doReduce任务统计相同key出现次数）
 5. 步骤4中使用对相同的key值使用hash取模%nreduce来达到相同key保存到同一个文件中
-
 >      common_reduce.go#doReduce():（本次test中reduceF（）直接返回空）
 1. 将nreduce个中间文件（domap步骤生成），内容读取出来
 2. 将1中读取内容统计到一个keyval的map中，其中map的key为单词word，value为对应出现的次数数组
@@ -168,6 +167,7 @@ vim ~.bash_profile
 #### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
 1. main/wc.go#mapF()（实现可以参考part1中的mapFunc）：根据传入的文件内容，将之分割为一个个单词，然后范围key为单词，value为单词出现次数的keyval数组
 2. main/wc.go#reduceF()：根据传入进来的keyval数组，返回当前word出现的次数
+3. 其中输入文件数量为map执行任务数量，其中nreduce为执行reduce任务数量也即输出中间文件个数
 
 
 ### Part 3：分布式mapreduce任务
@@ -196,6 +196,14 @@ RPC参数file只用于map任务，代表map中哪一个被读文件名。schedul
 >      go test -run TestBasic
 
 
+#### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+1. mapreduce#schedule()函数将会被调用两次，第一次为map阶段，第二次为reduce阶段
+2. 如果为map阶段，则执行map任务数量为map输入文件个数，如果为reduce阶段，则reduce任务数为该nreduce值
+（其中输入文件数量为map执行任务数量，其中nreduce为执行reduce任务数量也即输出中间文件个数）
+3. 由于map或者reduce阶段，都需要等所有任务完成才能返回，因此可以使用sync.WaitGroup等待所有任务完成再返回
+4. 使用for循环，执行ntask次任务，每次任务使用RPC调用，call()远程调用worker.go#DoTask方法
+5. 如果远程调用DoTask方法返回成功，则将当期worker放置到空闲worker通道中，供下一次复用
+如果返回失败，则continue，重新获取一个新的空闲worker来执行当前任务
 
 
 

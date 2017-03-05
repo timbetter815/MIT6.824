@@ -41,7 +41,6 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	 * @since 2017/3/4
 	 * @params
 	 */
-
 	var wg sync.WaitGroup
 
 	// 如果为map阶段，则循环获取mapfile文件，如果为reduce阶段，则循环nreduce次数
@@ -68,7 +67,6 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 				// 执行失败则重新执行
 				goto STARTRPC
 			}
-
 		}(i)
 	}
 
