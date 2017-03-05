@@ -207,6 +207,12 @@ RPC参数file只用于map任务，代表map中哪一个被读文件名。schedul
 
 
 
+### Part 4：处理worker执行任务失败情况
+1. 本部分将需要处理worker失败的情况，由于worker为无状态的，因此mapreduce处理这种情况相对比较容易
+2. 如果master通过RPC分配任务给worker失败（或者超时），那么master需要将该任务重新分配给一个其他的worker来处理
+3. RPC失败，并不总是意味着该worker不能执行该任务，有可能是RPC的reply丢失、或者master的RPC超时（但是worker仍然在执行任务）
+因此有可能两个worker执行着相同的任务，产生相同的输出。
+
 
 
 

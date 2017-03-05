@@ -15,6 +15,11 @@ type Task struct {
 	status           string
 }
 
+/**
+ * @author tantexian<my.oschina.net/tantexian>
+ * @since 2017/3/5
+ * @params
+ */
 func TestRegisterWorker(t *testing.T) {
 	allWorkers := make(chan string)
 	go registerWorker(allWorkers, 10)

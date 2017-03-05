@@ -48,9 +48,9 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 		wg.Add(1)
 
 		go func(index int) {
-			STARTRPC:
 			// 函数退出时候执行
 			defer wg.Done()
+			STARTRPC:
 			// 获取空闲worker
 			idleWorker := <-registerChan
 
