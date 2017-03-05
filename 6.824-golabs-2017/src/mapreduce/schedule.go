@@ -33,7 +33,7 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	// All ntasks tasks have to be scheduled on workers, and only once all of
 	// them have been completed successfully should the function return.
 	// Remember that workers may fail, and that any given worker may finish
-// multiple tasks.
+	// multiple tasks.
 	//
 	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 	/**
