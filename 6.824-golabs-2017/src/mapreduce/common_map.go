@@ -72,23 +72,6 @@ func doMap(
 	// 获取该文件的所有内容，传递给用户mapF函数处理
 	contents := string(fd)
 
-	/*fileName := reduceName(jobName, mapTaskNumber, nReduce)
-	file, err := os.Create(fileName)
-	if err != nil {
-		log.Fatal("create reduce file: ", err)
-	}
-
-	keyVals := mapF(fileName, contents)
-	for _, keyVal := range keyVals {
-		enc := json.NewEncoder(file)
-		err := enc.Encode(&keyVal)
-		if err != nil {
-			log.Fatal("write json data to  file: ", err)
-		}
-	}
-
-	file.Close()*/
-
 	for i := 0; i < nReduce; i++ {
 		fileName := reduceName(jobName, mapTaskNumber, i)
 		file, err := os.Create(fileName)
@@ -98,7 +81,7 @@ func doMap(
 		file.Close()
 	}
 
-	keyVals := mapF("unuserd-mapF-filename", contents)
+	keyVals := mapF(inFile, contents)
 	for _, keyVal := range keyVals {
 		// 此处ihash(keyVal.Key) % nReduce使得相同的key得内容一定保存在同一个文件中
 		fileName := reduceName(jobName, mapTaskNumber, ihash(keyVal.Key)%nReduce)
