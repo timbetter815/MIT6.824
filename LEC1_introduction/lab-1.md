@@ -248,6 +248,20 @@ ABSOLUTE: 1 pg-les_miserables.txt
 ```
 
 
+### 本次需要完成代码：
+main#ii.go#mapF()/reduceF()
+
+### 测试：
+>      cd "$GOPATH/src/main"
+>      go run ii.go master sequential pg-*.txt
+
+
+### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+1. mapF()根据输入文件名filename及内容，将内容分割为一个个单词，然后返回当前key=word，val=filename的值
+2. reduceF(),将同一个key对应的多个filename数组进行计算得出出现次数，
+其次将所有出现该单词的所有文件的文件名查找出来（相同文件名需要去重）
+PS：去重使用map来实现，由于底层使用hash算法复杂度为O(1),数组具有n个元素，因此整体复杂度为O(n)
+
 
 
 
