@@ -263,6 +263,9 @@ main#ii.go#mapF()/reduceF()
 PS：去重使用map来实现，由于底层使用hash算法复杂度为O(1),数组具有n个元素，因此整体复杂度为O(n)
 
 
+## 执行所有测试：
+>      cd "$GOPATH/src/main"
+>      bash ./test-mr.sh
 
 
 
