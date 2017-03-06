@@ -22,7 +22,10 @@ type Task struct {
  */
 func TestRegisterWorker(t *testing.T) {
 	allWorkers := make(chan string)
-	go registerWorker(allWorkers, 10)
+	var workerNum = 5;
+	var failNum = 0;
+	lock := sync.Mutex{}
+	go registerWorker(allWorkers, workerNum)
 	// var idleWorker string 此处不能定义为全局变量，否则会有并发问题
 	var wg sync.WaitGroup
 
@@ -31,13 +34,16 @@ func TestRegisterWorker(t *testing.T) {
 
 		go func(index int) {
 			defer wg.Done()
+
 			START:
 			idleWorker := <-allWorkers
-
 			num := rand.Intn(100)
-			if (num % 10 == 0) {
+			if (num % 10 == 0 && failNum < workerNum - 1) {
+				lock.Lock()
+				failNum++;
+				lock.Unlock()
 				fmt.Printf("---- index==%v is fail, idleWorker==%v \n", index, idleWorker)
-				goto START
+				goto START //
 
 			} else {
 				fmt.Printf("index==%v is success, idleWorker==%v \n", index, idleWorker)
@@ -56,8 +62,8 @@ func TestRegisterWorker(t *testing.T) {
 
 func registerWorker(allWorkers chan string, workNum int) {
 	for i := 0; i < workNum; i++ {
-		if (i % 5 == 0) {
-			time.Sleep(time.Second)
+		if (i % 3 == 0) {
+			time.Sleep(time.Millisecond * 100)
 		}
 		go func(index int) {
 			allWorkers <- ("worker" + strconv.Itoa(index))

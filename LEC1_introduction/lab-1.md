@@ -108,11 +108,11 @@ how the other methods fit into the overall architecture of the system.
 
 ----------
 
-## 接下来开始lab1：
+# 接下来开始lab1：
 ### 首先下载源代码[git仓库地址](git://g.csail.mit.edu/6.824-golabs-2017 6.824)，且配置好该源代码src路径到GOPATH中。
 
 ---
-##### 设置linux环境下gopath（windows类似）：
+#### 设置linux环境下gopath（windows类似）：
 vim ~.bash_profile
 >      export GOROOT=/home/go
 >      export PATH=$GOROOT/bin:$PATH
@@ -121,20 +121,20 @@ vim ~.bash_profile
 >      alias cdmit='cd /home/gopath/src/git.oschina.net/tantexian/MIT6.824/6.824-golabs-2017/src'
 ---
 
-### Part 1：Map/Reduce输入及输出
+## Part 1：Map/Reduce输入及输出
 1. 从测试代码入手：~/6.824-golabs-2017/src/mapreduce/test_test.go
 2. test_test.go为测试用例代码，其中覆盖了很多场景用例，TestSequentialSingle()测试方法入手，分析跟踪代码。
 3. 更多具体代码逻辑解析，直接在源代码中进行注释，请查看对应源代码注释。
 
-#### 本次需要完成代码：
+### 本次需要完成代码：
 1. 将输出分割成map任务的函数和为reduce任务收集全部输入的函数。
 2. 实现common_map.go里面的doMap函数和common_reduce.go里面的doReduce函数。
 
-#### 测试：
+### 测试：
 >      cd "$GOPATH/src/mapreduce"
 >      go test -run Sequential
 
-#### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
 >      common_map.go#domap():（本次test中mapF（）进行了单词分割统计）
 1. 根据input file使用utilio将该文件的内容全部读取出来保存到contents
 2. 调用mapF将文件内容contents分割为一个个单词，然后返回一个keyval数组（其中key为该单词，value为单词出现的次数（默认都有出现1次））
@@ -149,28 +149,28 @@ vim ~.bash_profile
 5. 将4中对每一个单词出现多少次的计算结果保存到一个输出文件中
 
 
-### Part 2：Single-worker单词统计
+## Part 2：Single-worker单词统计
 1. 从代码main/wc.go入手
 2. 在linux上执行go run wc.go master sequential pg-*.txt
 3. 完成代码之后，将得到统计完成所有word出现次数的输出文件
 
 
-#### 本次需要完成代码：
+### 本次需要完成代码：
 1. main/wc.go#mapF()（实现可以参考part1中的mapFunc）
 2. main/wc.go#reduceF()（实现可以参考part1中的reduceFunc）
 
-#### 测试：
+### 测试：
 >      cd "$GOPATH/src/main"
 >      go run wc.go master sequential pg-*.txt
 
 
-#### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
 1. main/wc.go#mapF()（实现可以参考part1中的mapFunc）：根据传入的文件内容，将之分割为一个个单词，然后范围key为单词，value为单词出现次数的keyval数组
 2. main/wc.go#reduceF()：根据传入进来的keyval数组，返回当前word出现的次数
 3. 其中输入文件数量为map执行任务数量，其中nreduce为执行reduce任务数量也即输出中间文件个数
 
 
-### Part 3：分布式mapreduce任务
+## Part 3：分布式mapreduce任务
 1. 在这部分实验中，你将会完成另外一个版本的MapReduce,将工作分散到一系列的工作线程，为了充分利用多核的作用。
 虽然工作不是分布在真正的多机上面，不过你的实现可以使用RPC和Channel来模拟一个真正的分布式实现。
 2. mapreduce/master.go，主要管理mapreduce任务；mapreduce/common_rpc.go处理rpc
@@ -187,16 +187,16 @@ RPC参数file只用于map任务，代表map中哪一个被读文件名。schedul
 9. part3只需要修改schedule.go文件中代码，其他代码不允许修改提交。
 
 
-#### 本次需要完成代码：
+### 本次需要完成代码：
 修改完成schedule.go中的代码
 
 
-#### 测试：
+### 测试：
 >      cd "$GOPATH/src/mapreduce"
 >      go test -run TestBasic
 
 
-#### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
 1. mapreduce#schedule()函数将会被调用两次，第一次为map阶段，第二次为reduce阶段
 2. 如果为map阶段，则执行map任务数量为map输入文件个数，如果为reduce阶段，则reduce任务数为该nreduce值
 （其中输入文件数量为map执行任务数量，其中nreduce为执行reduce任务数量也即输出中间文件个数）
@@ -207,12 +207,45 @@ RPC参数file只用于map任务，代表map中哪一个被读文件名。schedul
 
 
 
-### Part 4：处理worker执行任务失败情况
+## Part 4：处理worker执行任务失败情况
 1. 本部分将需要处理worker失败的情况，由于worker为无状态的，因此mapreduce处理这种情况相对比较容易
 2. 如果master通过RPC分配任务给worker失败（或者超时），那么master需要将该任务重新分配给一个其他的worker来处理
 3. RPC失败，并不总是意味着该worker不能执行该任务，有可能是RPC的reply丢失、或者master的RPC超时（但是worker仍然在执行任务）
 因此有可能两个worker执行着相同的任务，产生相同的输出。
+PS：本次不需要处理master失败的情况，由于master是有状态的因此FT容错处理会相对困难，在后续课程实验中将会来解决该问题。
 
+
+### 本次需要完成代码：
+修改完成schedule.go中的代码
+
+### 测试：
+>      cd "$GOPATH/src/mapreduce"
+>      go test -run Failure
+
+
+### 分析（更多详细请参考对应[git地址:](https://git.oschina.net/tantexian/MIT6.824/)中的代码）：
+1. mapreduce#schedule()函数中，获取对于的远程RPC调用DoTask函数的返回值。
+2. 如果DoTask返回值为执行成功，则说明该次任务被当前worker处理成功执行完成，那么则将该worker回收到当前空闲workers中，供下一次任务调度执行使用
+3. 如果DoTask返回值为执行失败，则当前该次任务需要继续被分配重新分给一个新的worker去执行
+PS：此部分其他在Part 3中已经完成。
+
+
+
+## Part 5：倒排索引（可选的额外加分）
+1. 本次实验将创建map及reduce来实现倒排序功能。倒排索引广泛运用在计算科学领域，特别是资料搜索。
+广义地说，一个反向索引就是map,保存感兴趣的基础数据索引，来指向数据的原始位置。
+例如：在上下文搜索中，map即保存关键字指向所在文档的索引集合。
+2. 本次实验需要修改main/ii.go中的mapF及reduceF，让之能够产生一个倒排索引。
+3. 运行ii.go将输出元组列表，像如下格式：
+```
+$ go run ii.go master sequential pg-*.txt
+$ head -n5 mrtmp.iiseq
+A: 16 pg-being_ernest.txt,pg-dorian_gray.txt,pg-dracula.txt,pg-emma.txt,pg-frankenstein.txt,pg-great_expectations.txt,pg-grimm.txt,pg-huckleberry_finn.txt,pg-les_miserables.txt,pg-metamorphosis.txt,pg-moby_dick.txt,pg-sherlock_holmes.txt,pg-tale_of_two_cities.txt,pg-tom_sawyer.txt,pg-ulysses.txt,pg-war_and_peace.txt
+ABC: 2 pg-les_miserables.txt,pg-war_and_peace.txt
+ABOUT: 2 pg-moby_dick.txt,pg-tom_sawyer.txt
+ABRAHAM: 1 pg-dracula.txt
+ABSOLUTE: 1 pg-les_miserables.txt
+```
 
 
 
