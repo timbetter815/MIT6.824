@@ -18,5 +18,4 @@ const (
 
 func Test1(t *testing.T) {
 	fmt.Printf("KB=%v, MB=%v, GB=%v, TB=%v", KB, MB, GB, TB)
-	io.Writer()
 }
