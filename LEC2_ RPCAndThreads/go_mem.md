@@ -113,7 +113,7 @@ Synchronization
 ## 同步
 
 Initialization
-### 初始化
+## 初始化
 
 Program initialization runs in a single goroutine,
 but that goroutine may create other goroutines, which run concurrently.
@@ -127,10 +127,10 @@ The start of the function main.main happens after all init functions have finish
 > 函数main.mian在所有init初始化函数的完成后发生。
 
 Goroutine creation
-### Goroutine创建
+## Goroutine创建
 
 The go statement that starts a new goroutine happens before the goroutine's execution begins.
-> go的声明开始一个goroutine先于goroutine的执行
+> 用于启动goroutine的go语句在goroutine之前运行。
 
 For example, in this program:
 ```
@@ -146,14 +146,14 @@ func hello() {
 }
 ```
 calling hello will print "hello, world" at some point in the future (perhaps after hello has returned).
-> 调用hello函数将打印“hello，workd”，在将来的某个时候（也可能在hello返回之后在打印）
+> 调用hello函数，会在某个时刻打印“hello, world”（有可能是在hello函数返回之后）。
 
 
 Goroutine destruction
-### Goroutine销毁
+## Goroutine销毁
 
 The exit of a goroutine is not guaranteed to happen before any event in the program.
-> goroutine的推出不保证一定会先于其他事件发生。
+> goroutine的退出不保证一定会先于其他事件发生。
 
 For example, in this program:
 ```
@@ -176,7 +176,7 @@ use a synchronization mechanism such as a lock or channel communication to estab
 可以使用同步机制例如lock或者channel通信来确定相关顺序。
 
 Channel communication
-### 通道通信
+## 通道通信
 
 Channel communication is the main method of synchronization between goroutines.
 Each send on a particular channel is matched to a corresponding receive from that channel,
@@ -286,12 +286,16 @@ func main() {
 Locks
 ````
 The sync package implements two lock data types, sync.Mutex and sync.RWMutex.
+> sync包实现了两种类型的锁：互斥锁及读写锁
 
 For any sync.Mutex or sync.RWMutex variable l and n < m, call n of l.Unlock()
 happens before call m of l.Lock() returns.
+> 对于任意 sync.Mutex 或 sync.RWMutex 变量l。 如果 n < m ，那么第n次 l.Unlock() 调用在第 m次 l.Lock()调用返回前发生。
 
 This program:
 ````
+// 对同一个变量l的解锁n次和加锁操作m次，如果n<m,即解锁次数1小于加锁次数2，因此解锁操作先于加锁操作完成
+// 即f函数的unlock先于第二个lock完成，而第二个lock又先于print完成，因此保证a1的赋值能被打印出来
 var l sync.Mutex
 var a string
 
@@ -306,15 +310,21 @@ func main() {
 	l.Lock()
 	print(a)
 }
+
 ````
 is guaranteed to print "hello, world". The first call to l.Unlock() (in f)
 happens before the second call to l.Lock() (in main) returns, which happens before the print.
+> 可以确保输出“hello, world”结果。因为，第一次 l.Unlock() 调用（在f函数中）在第二次 l.Lock() 调用（在main 函数中）返回之前发生，
+也就是在 print 函数调用之前发生。
 
 For any call to l.RLock on a sync.RWMutex variable l,
 there is an n such that the l.RLock happens (returns) after call n to l.Unlock
 and the matching l.RUnlock happens before call n+1 to l.Lock.
+> 对于任何调用变量l的RLock，第n次调用l.RLock必定发生在第n次l.Unlock之后,
+与之相对应的l.RUnlock必定发生在第n+1次l.Lock之前。
 
 Once
+## 一次执行
 
 The sync package provides a safe mechanism for initialization in the presence of multiple goroutines
 through the use of the Once type. Multiple threads can execute once.Do(f) for a particular f,

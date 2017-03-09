@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"strconv"
 )
 
 /**
@@ -47,7 +48,6 @@ func Test_GlobalLock(t *testing.T) {
 	time.Sleep(time.Second * 10)
 }
 
-
 func (myLock *MyLock) OBJLock_A() {
 	lock := sync.Mutex{}
 	lock.Lock()
@@ -80,5 +80,114 @@ func Test_OBJLock(t *testing.T) {
 	go myLock2.OBJLock_B()
 
 	time.Sleep(time.Second * 10)
+}
+
+var rwlock sync.RWMutex
+var a3 string
+
+func f3() {
+	time.Sleep(100 * time.Millisecond)
+	a3 = "hello, world"
+	rwlock.Unlock()
+
+}
+
+func f4() {
+	time.Sleep(100 * time.Millisecond)
+	a3 = "hello, world2"
+	rwlock.Lock()
+
+}
+
+func TestRWMutex(t *testing.T) {
+	rwlock.Lock()
+	go f3()
+	go f4()
+	a3 = "hello, world3"
+	rwlock.RLock() // 这是第n(1)次出现RLock，应该要先于第n+1(2)次lock的发生，即应该先于f4中的lock之前发生。
+	print(a3)
+}
+
+
+var l sync.Mutex
+var a1 string
+
+// 由于unlock在a1赋值之前，因此主线程可能看不到a1赋值的值
+func f1() {
+	l.Unlock()
+	time.Sleep(100 * time.Millisecond)
+	a1 = "hello, world"
+
+}
+
+
+func TestMutex1(t *testing.T) {
+	l.Lock()
+	go f1()
+	l.Lock()
+	print(a1)
+}
+
+
+
+func f2() {
+	a1 = "hello, world"
+	l.Unlock()
+
+}
+
+// 对同一个变量l的解锁n次和加锁操作m次，如果n<m,即解锁次数1小于加锁次数2，因此解锁操作先于加锁操作完成
+// 即f函数的unlock先于第二个lock完成，而第二个lock又先于print完成，因此保证a1的赋值能被打印出来
+func TestMutex2(t *testing.T) {
+	l.Lock()
+	go f2()
+	l.Lock() // 如果此处语句屏蔽，则a1打印为空
+	print(a1)
+	time.Sleep(time.Second)
+}
+
+
+var a string
+
+func f() {
+	println(a)
+}
+
+func hello() {
+	a = "hello, world"
+	go f()
+}
+
+func hello1() {
+	go func() {
+		a = "hello"
+	}()
+	print(a)
+	time.Sleep(time.Second)
+}
+
+func TestGoroutine(t *testing.T) {
+	hello1()
+}
+
+var limit = make(chan int, 5)
+
+func printHello(i int) {
+	fmt.Println(strconv.Itoa(i))
+}
+
+func TestLimit(t *testing.T) {
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			limit <- 1
+			go printHello(index)
+			<-limit
+		}(i)
+	}
+	wg.Wait()
+	// select {}
 }
 
