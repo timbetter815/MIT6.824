@@ -14,17 +14,17 @@ Channel communication
 Locks
 Once
 Incorrect synchronization
-1. 介绍
-2. 建议
-3. Happens Before原则
-4. 同步
-5. 初始化
-6. Goroutine创建
-7. Goroutine销毁
-8. 通道通信
-9. 锁
-10. 一次
-11. 不正确的同步
+> 1. 介绍
+> 2. 建议
+> 3. Happens Before原则
+> 4. 同步
+> 5. 初始化
+> 6. Goroutine创建
+> 7. Goroutine销毁
+> 8. 通道通信
+> 9. 锁
+> 10. 一次
+> 11. 不正确的同步
 
 Introduction
 ## 介绍
@@ -66,50 +66,74 @@ a partial order on the execution of memory operations in a Go program.
 If event e1 happens before event e2, then we say that e2 happens after e1.
 Also, if e1 does not happen before e2 and does not happen after e2,
 then we say that e1 and e2 happen concurrently.
+> 为了详细说明Go程序的读写在内存中的偏序关系，我们定义了happen-before原则。
+> 如果时间e1发生在事件e2之前，那么则e2发生在e1之后。
+> 如果e1既不发生在e2之前也不发生在它之后，那么则说明e1和e2同时发生。
 
 Within a single goroutine, the happens-before order is the order expressed by the program.
+> 在一个单goroutine中，happen-before的顺序与程序中定义的顺序保持一致。
 
 A read r of a variable v is allowed to observe a write w to v if both of the following hold:
+1、r does not happen before w.
+2、There is no other write w' to v that happens after w but before r.
+> 如果满足下述两个规则：那么对变量v的读操作r能够观察到对变量v的写操作w：
+> 1. r没有发生在w之前
+> 2. 没有其他针对变量v的写操作发生在w操作之后，r之前
 
-r does not happen before w.
-There is no other write w' to v that happens after w but before r.
 To guarantee that a read r of a variable v observes a particular write w to v,
 ensure that w is the only write r is allowed to observe.
 That is, r is guaranteed to observe w if both of the following hold:
+1、w happens before r.
+2、Any other write to the shared variable v either happens before w or after r.
+> 为了保证对变量v的读操作能够观察到对变量v的特定的写操作w的值，确保w是唯一的写操作，r的变化允许被观察到。
+> 那么，如果满足下述两个原则，r将能够观察到w
+> 1. w发生在r之前
+> 2. 任何对共享变量v的写操作发生在写操作w之前或者读操作r之后
 
-w happens before r.
-Any other write to the shared variable v either happens before w or after r.
 This pair of conditions is stronger than the first pair;
 it requires that there are no other writes happening concurrently with w or r.
+> 这对条件强于第一条；它需要没有其他任何的写操作与读操作w及写操作r同时发生。
 
 Within a single goroutine, there is no concurrency, so the two definitions are equivalent:
 a read r observes the value written by the most recent write w to v.
 When multiple goroutines access a shared variable v,
 they must use synchronization events to establish happens-before conditions that ensure reads observe the desired writes.
+> 在单一的goroutine中，由于不可能同时发生，因此两个定义也是等价的：
+> 针对变量v的r操作能够观察到最近对改变了的写操作
+> 当多个goroutine同时访问一个共享变量v时，必须使用sync同步事件建立happen-before条件来确保读操作观察到期望的写操作的变化。
 
 The initialization of variable v with the zero value for v's type behaves as a write in the memory model.
+> 变量v的初始化以零值作为默认值的类型的行为作为一个写在内存模型。
 
 Reads and writes of values larger than a single machine word
 behave as multiple machine-word-sized operations in an unspecified order.
+> 如果读取和写入的值大于一个机器字,那么多个多机器字节变量的操作发生在一个未指明的顺序。
 
 Synchronization
+## 同步
 
 Initialization
+### 初始化
 
 Program initialization runs in a single goroutine,
 but that goroutine may create other goroutines, which run concurrently.
+> 程序初始化运行在单个goroutine上，但是goroutine可能创建其他goroutine，并发运行。
 
 If a package p imports package q, the completion of q's init functions
 happens before the start of any of p's.
+> 如果一个包p导入了一个包q,q的初始化函数的结束先于任何p的开始完成。
 
 The start of the function main.main happens after all init functions have finished.
+> 函数main.mian在所有init初始化函数的完成后发生。
 
 Goroutine creation
+### Goroutine创建
 
 The go statement that starts a new goroutine happens before the goroutine's execution begins.
+> go的声明开始一个goroutine先于goroutine的执行
 
 For example, in this program:
-
+```
 var a string
 
 func f() {
@@ -120,35 +144,52 @@ func hello() {
 	a = "hello, world"
 	go f()
 }
+```
 calling hello will print "hello, world" at some point in the future (perhaps after hello has returned).
+> 调用hello函数将打印“hello，workd”，在将来的某个时候（也可能在hello返回之后在打印）
+
 
 Goroutine destruction
+### Goroutine销毁
 
-The exit of a goroutine is not guaranteed to happen before any event in the program. For example, in this program:
+The exit of a goroutine is not guaranteed to happen before any event in the program.
+> goroutine的推出不保证一定会先于其他事件发生。
 
+For example, in this program:
+```
 var a string
 
 func hello() {
 	go func() { a = "hello" }()
-	print(a)
+	print(a) // 由于没有使用同步相关事件，因此有可能a的赋值对其他线程是不可见的
 }
+```
 the assignment to a is not followed by any synchronization event,
 so it is not guaranteed to be observed by any other goroutine.
 In fact, an aggressive compiler might delete the entire go statement.
+> 对a的分配赋值没有跟随任何同步事件之后, 所以不能保证会被其他goroutine观察到。
+事实上,一个优秀的编译器可能会删除整个go声明语句。
 
 If the effects of a goroutine must be observed by another goroutine,
 use a synchronization mechanism such as a lock or channel communication to establish a relative ordering.
+> 如果想让一个goroutine的执行操作影响必须对另外一个goroutine可见，
+可以使用同步机制例如lock或者channel通信来确定相关顺序。
 
 Channel communication
+### 通道通信
 
 Channel communication is the main method of synchronization between goroutines.
 Each send on a particular channel is matched to a corresponding receive from that channel,
 usually in a different goroutine.
+> 通道通信是主要的方法来解决多个goroutine之间的同步。
+每发送一个特定的信道匹配相应的接收通道，通常在不同的goroutine中。
+
 
 A send on a channel happens before the corresponding receive from that channel completes.
+> 一个通道的发送发生与相应的通道接收之前完成
 
 This program:
-
+````
 var c = make(chan int, 10)
 var a string
 
@@ -162,23 +203,29 @@ func main() {
 	<-c
 	print(a)
 }
+````
 is guaranteed to print "hello, world".
 The write to a happens before the send on c,
 which happens before the corresponding receive on c completes,
 which happens before the print.
+> 确保一定能够打印出“hello，world”。
+对a的写先于对c通道信息的发送，c通道的发送一定会先于c通道接受的完成，因此这些都先于print完成。
 
 The closing of a channel happens before a receive that returns a zero value
 because the channel is closed.
+> 关闭一个通道发生之前收到返回零值 因为通道是关闭的
 
 In the previous example, replacing c <- 0 with close(c) yields a program
 with the same guaranteed behavior.
+> 在上一个示例中,用close(c)取代c < - 0,同样能够保证相同的行为
 
 A receive from an unbuffered channel happens before the send on
 that channel completes.
+> A接收一个无缓冲的通道信号先于发送，当通道完成。
 
 This program (as above, but with the send and receive statements swapped
 and using an unbuffered channel):
-
+````
 var c = make(chan int)
 var a string
 
@@ -191,17 +238,22 @@ func main() {
 	c <- 0
 	print(a)
 }
+````
 is also guaranteed to print "hello, world".
 The write to a happens before the receive on c,
 which happens before the corresponding send on c completes,
 which happens before the print.
+> 任然能够保证一定会输出“hello，world”
+对a的写操作先于通道c的信号接收，这也发生在相应的发送完成之前，当然也先于print的发生。
 
 If the channel were buffered (e.g., c = make(chan int, 1))
 then the program would not be guaranteed to print "hello, world".
 (It might print the empty string, crash, or do something else.)
+> 如果是缓存通道，那么程序则不一定能保证会打印“hello，world”。（可能打印空字符串或者crash、或者其他未知情况）
 
 The kth receive on a channel with capacity C
 happens before the k+Cth send from that channel completes.
+> kth收到一个通道先于k+Cth发送通道完成.
 
 This rule generalizes the previous rule to buffered channels.
 It allows a counting semaphore to be modeled by a buffered channel:
@@ -209,11 +261,16 @@ the number of items in the channel corresponds to the number of active uses,
 the capacity of the channel corresponds to the maximum number of simultaneous uses,
 sending an item acquires the semaphore, and receiving an item releases the semaphore.
 This is a common idiom for limiting concurrency.
+> 这些定义了缓存channel通道前序规则。
+允许一个计数信号量通过缓存通道来模拟：
+通道缓存数量与活跃用户保存一致，通道的最大容量与并发同时执行的最大人数保持一致，发送一个item获取信号量及接受一个item释放信号量。这个一个惯用的方式来限制并发。
 
 This program starts a goroutine for every entry in the work list,
 but the goroutines coordinate using the limit channel to
 ensure that at most three are running work functions at a time.
+> 示例：程序为工作列表中的每一个条目启动一个goroutine，但是各个goroutine之间使用受限制的缓存通道来确保最多只能有三个运行work在同时执行。
 
+````
 var limit = make(chan int, 3)
 
 func main() {
@@ -227,14 +284,14 @@ func main() {
 	select{}
 }
 Locks
-
+````
 The sync package implements two lock data types, sync.Mutex and sync.RWMutex.
 
 For any sync.Mutex or sync.RWMutex variable l and n < m, call n of l.Unlock()
 happens before call m of l.Lock() returns.
 
 This program:
-
+````
 var l sync.Mutex
 var a string
 
@@ -249,6 +306,7 @@ func main() {
 	l.Lock()
 	print(a)
 }
+````
 is guaranteed to print "hello, world". The first call to l.Unlock() (in f)
 happens before the second call to l.Lock() (in main) returns, which happens before the print.
 
@@ -265,7 +323,7 @@ but only one will run f(), and the other calls block until f() has returned.
 A single call of f() from once.Do(f) happens (returns) before any call of once.Do(f) returns.
 
 In this program:
-
+````
 var a string
 var once sync.Once
 
@@ -282,6 +340,7 @@ func twoprint() {
 	go doprint()
 	go doprint()
 }
+````
 calling twoprint causes "hello, world" to be printed twice.
 The first call to doprint runs setup once.
 
@@ -291,7 +350,7 @@ Note that a read r may observe the value written by a write w that happens concu
 it does not imply that reads happening after r will observe writes that happened before w.
 
 In this program:
-
+````
 var a, b int
 
 func f() {
@@ -308,13 +367,14 @@ func main() {
 	go f()
 	g()
 }
+````
 it can happen that g prints 2 and then 0.
 
 This fact invalidates a few common idioms.
 
 Double-checked locking is an attempt to avoid the overhead of synchronization.
 For example, the twoprint program might be incorrectly written as:
-
+````
 var a string
 var done bool
 
@@ -334,11 +394,12 @@ func twoprint() {
 	go doprint()
 	go doprint()
 }
+````
 but there is no guarantee that, in doprint, observing the write to done implies observing the write to a.
 This version can (incorrectly) print an empty string instead of "hello, world".
 
 Another incorrect idiom is busy waiting for a value, as in:
-
+````
 var a string
 var done bool
 
@@ -353,6 +414,7 @@ func main() {
 	}
 	print(a)
 }
+````
 As before, there is no guarantee that, in main,
 observing the write to done implies observing the write to a,
 so this program could print an empty string too.
@@ -361,7 +423,7 @@ since there are no synchronization events between the two threads.
 The loop in main is not guaranteed to finish.
 
 There are subtler variants on this theme, such as this program.
-
+````
 type T struct {
 	msg string
 }
@@ -380,6 +442,7 @@ func main() {
 	}
 	print(g.msg)
 }
+````
 Even if main observes g != nil and exits its loop,
 there is no guarantee that it will observe the initialized value for g.msg.
 

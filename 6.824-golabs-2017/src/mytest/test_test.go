@@ -3,6 +3,9 @@ package mytest
 import (
 	"testing"
 	"fmt"
+	"time"
+	"strconv"
+	"sync"
 )
 
 type ByteSize float64
@@ -210,4 +213,48 @@ func TestCount(t *testing.T) {
 	count := new(Counter)
 	count.ServeHTTP()
 
+}
+
+var a string
+
+func f() {
+	println(a)
+}
+
+func hello() {
+	a = "hello, world"
+	go f()
+}
+
+func hello1() {
+	go func() {
+		a = "hello"
+	}()
+	print(a)
+	time.Sleep(time.Second)
+}
+
+func TestGoroutine(t *testing.T) {
+	hello1()
+}
+
+var limit = make(chan int, 10)
+
+func printHello(i int) {
+	fmt.Println(strconv.Itoa(i))
+}
+
+func TestLimit(t *testing.T) {
+	wg := sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			limit <- 1
+			go printHello(index)
+			<-limit
+		}(i)
+	}
+	wg.Wait()
+	// select {}
 }
