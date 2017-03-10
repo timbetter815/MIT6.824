@@ -1,5 +1,7 @@
 The Go Memory Model
 # Go内存模型
+[更多详情请前往](https://my.oschina.net/tantexian)
+[或者](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_mem.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_mem.md&oid=5fca03003d6e62f098716d7bfbd9fb7be91ec3d1&sha=4d19b0880fadc8c2a63696ec736cac5eafa99c03)
 
 Version of May 31, 2014
 
