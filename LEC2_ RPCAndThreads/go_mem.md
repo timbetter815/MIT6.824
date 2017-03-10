@@ -329,8 +329,10 @@ Once
 The sync package provides a safe mechanism for initialization in the presence of multiple goroutines
 through the use of the Once type. Multiple threads can execute once.Do(f) for a particular f,
 but only one will run f(), and the other calls block until f() has returned.
+> sync包提供了一个安全的机制保证多个goroutine的初始化只被执行一次。多个线程都会调用执行once.Do(f)函数，但是f函数只会执行一次。
 
 A single call of f() from once.Do(f) happens (returns) before any call of once.Do(f) returns.
+> 通过once.Do(f)单次调用f()的返回先于其他调用once.Do(f)的返回。
 
 In this program:
 ````
@@ -353,11 +355,15 @@ func twoprint() {
 ````
 calling twoprint causes "hello, world" to be printed twice.
 The first call to doprint runs setup once.
+> twoprint函数将会两次打印输出，通过once.Do(setup)调用的setup只会有一次输出。
 
 Incorrect synchronization
+## 错误的同步
 
-Note that a read r may observe the value written by a write w that happens concurrently with r. Even if this occurs,
-it does not imply that reads happening after r will observe writes that happened before w.
+Note that a read r may observe the value written by a write w that happens concurrently with r.
+Even if this occurs,it does not imply that reads happening after r will observe writes that happened before w.
+> [错误认为:] 如果读操作和写操作同时发生，读操作r可以观察到写操作w的变化。
+即使发生这种情况,它也并不意味着即使读操作发生在写操作r之后就能观察到写入值writes就发生在w之前。
 
 In this program:
 ````
@@ -379,12 +385,16 @@ func main() {
 }
 ````
 it can happen that g prints 2 and then 0.
+> 有可能打印出2和0（即b已经赋值为2，但是a还未被赋值）
 
 This fact invalidates a few common idioms.
+> 下述示例为一些无效错误的惯例。
 
 Double-checked locking is an attempt to avoid the overhead of synchronization.
 For example, the twoprint program might be incorrectly written as:
-````
+> 双检锁是为了避免同步的开销，例如,twoprint程序可能会错误地写成：
+
+```
 var a string
 var done bool
 
@@ -404,11 +414,16 @@ func twoprint() {
 	go doprint()
 	go doprint()
 }
-````
+```
+
 but there is no guarantee that, in doprint, observing the write to done implies observing the write to a.
 This version can (incorrectly) print an empty string instead of "hello, world".
+> 这里不能保证，在doprint函数里面，能够观察到变量done的值，就暗示着能够观察到对a的赋值变化。
+这里可能会错误的打印空，而不是“hello, world”。
 
 Another incorrect idiom is busy waiting for a value, as in:
+> 下述为另外一个错误示例（一直忙等）
+
 ````
 var a string
 var done bool
@@ -431,8 +446,13 @@ so this program could print an empty string too.
 Worse, there is no guarantee that the write to done will ever be observed by main,
 since there are no synchronization events between the two threads.
 The loop in main is not guaranteed to finish.
+> 上述示例所示，在主函数main中，观察到done值为true并不能保证一定能看到对a的赋值变化, 因此本示例程序也有可能打印空值。
+> 更糟糕的是，setup函数对done=true的赋值，并不一定能被main函数观察到，因此这两个线程之间并没有使用任何的同步事件。
+> 因此for循环在主函数中并不能保证一定会循环结束。
 
 There are subtler variants on this theme, such as this program.
+> 下述为一些更为难以发现的变体(错误示例)
+
 ````
 type T struct {
 	msg string
@@ -455,5 +475,7 @@ func main() {
 ````
 Even if main observes g != nil and exits its loop,
 there is no guarantee that it will observe the initialized value for g.msg.
+> 即使主函数观察到g!=null且退出了循环，也不能保证main能够观察到g.msg的赋值内容。
 
 In all these examples, the solution is the same: use explicit synchronization.
+> 对于所有的示例，都可以采用同样的解决办法：使用明确的同步。

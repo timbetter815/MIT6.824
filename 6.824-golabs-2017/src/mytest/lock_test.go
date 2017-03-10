@@ -147,22 +147,22 @@ func TestMutex2(t *testing.T) {
 }
 
 
-var a string
+var a111 string
 
 func f() {
-	println(a)
+	println(a111)
 }
 
 func hello() {
-	a = "hello, world"
+	a111 = "hello, world"
 	go f()
 }
 
 func hello1() {
 	go func() {
-		a = "hello"
+		a111 = "hello"
 	}()
-	print(a)
+	print(a111)
 	time.Sleep(time.Second)
 }
 
