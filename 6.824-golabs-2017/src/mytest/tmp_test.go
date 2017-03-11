@@ -35,11 +35,19 @@ func TestRangeChan(t *testing.T) {
 	go put2Ch(ci, 2)
 	go put2Ch(ci, 3)
 
-	time.Sleep(3 * time.Second)
+	//time.Sleep(3 * time.Second)
 	//close(ci)
-	for i := range ci {
-		fmt.Println(i)
-	}
-	time.Sleep(3 * time.Second)
-
+	go func() {
+		for i := range ci {
+			fmt.Println(i)
+		}
+	}()
+	go put2Ch(ci, 4)
+	go put2Ch(ci, 5)
+	go put2Ch(ci, 6)
+	time.Sleep(time.Second)
+	go put2Ch(ci, 7)
+	go put2Ch(ci, 8)
+	go put2Ch(ci, 9)
+	time.Sleep(time.Second)
 }

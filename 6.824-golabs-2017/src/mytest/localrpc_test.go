@@ -14,6 +14,7 @@ var quit chan bool
 var once sync.Once
 
 func initChan() {
+	fmt.Printf("[%v]: initChan\n", time.Now())
 	quit = make(chan bool)
 	clientRequests = make(chan *Request, MaxOutstanding)
 }
@@ -56,22 +57,28 @@ func sendRequestToServer() {
 	// Send request
 	clientRequests <- request
 	// Wait for response.
-	fmt.Printf("client:[{arg1:%v}{arg2:%v}{arg3:%v}]answer: %d\n", arg1, arg2, arg3, <-request.resultChan)
+	fmt.Printf("\n#### The answer==%v client:[{arg1:%v}{arg2:%v}{arg3:%v}]\n\n", <-request.resultChan, arg1, arg2, arg3)
 
 }
 
-func TestClient(t *testing.T) {
+func startClient() {
 	once.Do(initChan)
 	// 每次间隔1000毫秒产生一次计算请求
 	for i := 0; i < MaxOutstanding; i++ {
-		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(3000)))
 		go sendRequestToServer()
 	}
 }
 
-func TestStartServer(t *testing.T) {
-	once.Do(initChan)
+func startServer() {
 	go Serve(clientRequests, quit)
+
+}
+
+func TestRPC(t *testing.T) {
+	once.Do(initChan)
+	startServer()
+	startClient()
 	for {
 		time.Sleep(time.Second)
 		fmt.Printf("[%v]: I'm server, and runing... \n", time.Now())
