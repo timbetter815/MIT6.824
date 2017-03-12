@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 	"math/rand"
+	"runtime"
 )
 
 var MaxOutstanding = 10
@@ -58,7 +59,6 @@ func sendRequestToServer() {
 	clientRequests <- request
 	// Wait for response.
 	fmt.Printf("\n#### The answer==%v client:[{arg1:%v}{arg2:%v}{arg3:%v}]\n\n", <-request.resultChan, arg1, arg2, arg3)
-
 }
 
 func startClient() {
@@ -72,7 +72,6 @@ func startClient() {
 
 func startServer() {
 	go Serve(clientRequests, quit)
-
 }
 
 func TestRPC(t *testing.T) {
@@ -81,7 +80,7 @@ func TestRPC(t *testing.T) {
 	startClient()
 	for {
 		time.Sleep(time.Second)
-		fmt.Printf("[%v]: I'm server, and runing... \n", time.Now())
+		fmt.Printf("[%v]: I'm server, and runing... [NumCPU()==%v, NumGoroutine()==%v]\n", time.Now(), runtime.NumCPU(), runtime.NumGoroutine())
 	}
 	//quit <- true
 }

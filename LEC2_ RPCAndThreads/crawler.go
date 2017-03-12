@@ -126,8 +126,7 @@ func CrawlConcurrentChannel(url string, fetcher Fetcher) {
 
 func main() {
 	fmt.Printf("=== Serial===\n")
-	// url := "http://golang.org/"
-	url := "https://my.oschina.net/tantexian/"
+	url := "http://golang.org/"
 	CrawlSerial(url, fetcher, make(map[string]bool))
 
 	fmt.Printf("=== ConcurrentMutex ===\n")

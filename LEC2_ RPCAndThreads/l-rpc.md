@@ -96,7 +96,15 @@ Threading challenges:
   granularity of concurrencyq
      coarse-grained -> simple, but little concurrency/parallelism
      fine-grained -> more concurrency, more races and deadlocks
-  
+### 线程挑战
+1. 共享数据
+    1. 一个线程读取数据，另一个线程一定会感知该数据的变化？
+    2. 可能会导致竞态条件
+    3. 不共享或者协调共享（eg：互斥信号量）
+2. 线程之间的协调
+    1. 等待所有map线程完成
+    2. 导致死锁（通常更简单使用通知相对于竞态）
+
 Crawler exercise: two challenges
   Arrange for I/O concurrency
     While fetching an URL, work on another URL
@@ -106,7 +114,16 @@ Crawler exercise: two challenges
     => Need to some way of keeping track which URLs visited 
   [Work on different URLs on different cores]
     less agree that is important
-    
+### 爬虫联系:两个挑战
+1. I/O的并发
+    1. 当获取一个url，而该url又work在另一个线程
+2. 获取每一个URL一次
+    1. 阻止网络带宽的浪费
+    2. 对远程服务端更友好
+    3. 需要一些方式记录URL的访问轨迹
+3. [不同的url在不同的核上]
+
+
 Solutions [see handout: crawler.go]
   Eliminate depth --- use fetched instead
   Sequential one: pass fetched map to recursive calls
@@ -139,6 +156,38 @@ Solutions [see handout: crawler.go]
       when channel is empty
     Dispatch every url fetch through a master thread
       No races for fetched map, because it isn't shared!
+### 解决办法[处理方式：crawler.go]
+1. 消除深度--使用fetched代替
+2. 序列化：传递fetched map递推调用
+    1. 当获取数据花费比较长时间时，不同时处理
+    2. 不支持多核
+3. 通过goroutine及共享fetched map解决
+    1. 为每一个url创建一个线程
+    2. 为什么使用lock？（移除出现在work中的它们）
+        1. 没有锁将会出现什么问题？
+        2. 不会自动检查和标记url
+4. 可能对于同一个url获取两次
+    1. T1及T2都检查fetched[url]。
+    2. 同时观察到url没有被获取
+    3. 同时返回false，同时fetch，当出现错误
+    4. 这个被称之为竞态条件
+        1. 这个bug出现在一些线程之间交错
+5. 难以发现，难以推导
+    1. Go能够发现竞态通过例如：go run -race crawler.go
+    2. url访问的检查和标记必须是自动的
+6. 我们如何决定处理页面工作已经完成？
+    1. waitGroup
+7. 使用channels解决
+    1. 通道：广泛采用的机制处理线程协作
+        1. 有界的缓存区通道
+        2. 多个线程能够对通道发送及接受
+        3. （Go runtime内部使用锁）
+    2. 发送和接受会阻塞
+        1. channel满了
+        2. channel空了
+    3. 分发每一个url的获取通过主线程
+        1. 没有竞态从fetched map获取，因此它们并没有共享
+
 
 What is the best solution?
   All concurrent ones are substantial more difficult than serial one
@@ -152,6 +201,17 @@ What is the best solution?
   Use Go's race detector:
     https://golang.org/doc/articles/race_detector.html
     go test -race mypkg
+### 什么是最好的解决办法
+  1. 并发比序列化更复杂
+  2. 一些Go的设计者们极力反对共享内存
+    1. 例如：只建议仅仅使用channels
+  3. 我们的实验将使用多种并发特性
+    1. 当共享是自然的则使用locks
+        1. 例如： 多个服务器server共享map
+    2. 多个线程协作使用channels
+        1. 例如：生产者消费者模式并发
+  4. 使用Go的竞态检测：
+     [更多详细点击前往 ](https://golang.org/doc/articles/race_detector.html)
 
 Remote Procedure Call (RPC)
   a key piece of distributed system machinery; all the labs use RPC
