@@ -1,5 +1,8 @@
 Data Race Detector
-# Golang 数据竞态检测
+# Golang 数据竞态检测(官方文档中英文翻译)
+[Golang 数据竞态检测(官方文档中英文翻译)更多详情，点击前往 ](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_race_detector.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_race_detector.md&oid=650fa0ca8013b5fd9a420889a598da567798128b&sha=e1d3e2bbbc17a3e94b5d1af9ac20f1b841148d2e)
+
+[英文原始链接，点击前往 ](https://golang.org/doc/articles/race_detector.html)
 
 Introduction
 Usage

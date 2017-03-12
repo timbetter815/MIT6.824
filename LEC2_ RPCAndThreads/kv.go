@@ -76,7 +76,7 @@ func server() {
 	kv.keyvalue = map[string]string{}
 	rpcs := rpc.NewServer()
 	rpcs.Register(kv)
-	l, e := net.Listen("tcp", ":1234")
+	l, e := net.Listen("tcp", "127.0.0.1:1234")
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
@@ -99,7 +99,7 @@ func server() {
 //
 
 func Dial() *rpc.Client {
-	client, err := rpc.Dial("tcp", ":1234")
+	client, err := rpc.Dial("tcp", "127.0.0.1:1234")
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}

@@ -211,7 +211,10 @@ What is the best solution?
     2. 多个线程协作使用channels
         1. 例如：生产者消费者模式并发
   4. 使用Go的竞态检测：
-     [更多详细点击前往 ](https://golang.org/doc/articles/race_detector.html)
+     [Golang 数据竞态检测(官方文档中英文翻译)更多详情，点击前往 ](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_race_detector.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_race_detector.md&oid=650fa0ca8013b5fd9a420889a598da567798128b&sha=e1d3e2bbbc17a3e94b5d1af9ac20f1b841148d2e)
+
+     [英文原始链接，点击前往 ](https://golang.org/doc/articles/race_detector.html)
+
 
 Remote Procedure Call (RPC)
   a key piece of distributed system machinery; all the labs use RPC
@@ -220,7 +223,15 @@ Remote Procedure Call (RPC)
     client call is much like ordinary procedure call
     server handlers are much like ordinary procedures
   RPC is widely used!
+### 远程过程调用
+> 1.分布式系统的关键;所有试验使用RPC
+> 2.目标：易于编程的网络通信
+>   1. 隐藏client/server之间的大部份细节
+>   2. client的调用类似普通本地调用
+>   3. server处理非常类似普通过程调用
+> 3. RPC被广泛的使用
 
+```
 RPC ideally makes net communication look just like fn call:
   Client:
     z = fn(x, y)
@@ -230,12 +241,30 @@ RPC ideally makes net communication look just like fn call:
       return z
     }
   RPC aims for this level of transparency
+```
+
+> RPC旨在使得网络通信像普通本地功能调用一样：
+```
+  Client:
+    z = fn(x, y)
+  Server:
+    fn(x, y) {
+      compute
+      return z
+    }
+```
+> RPC的目标是这个水平的透明度
 
 Go example: kv.go  [see handout: kv.go]
   Client "dials" server and invokes Call()
     Call similar to a regular function call
   Server handles each request in a separate thread
     Concurrency!  Thus, locks for keyvalue.
+> Go示例：kv.go  [see handout: kv.go]
+> 1. Client连通server及调用Call()
+>   1. Call类似于一个常规的函数调用
+> 2. Server处理每一个request为每一个分布的线程
+>   1. 并发！因此对keyvalue加锁lock
 
 RPC message diagram:
   Client             Server
@@ -258,36 +287,65 @@ A few details:
   Binding: how does client know who to talk to?
     Maybe client supplies server host name
     Maybe a name service maps service names to best server host
+### 更多详细：
+> 1. 哪一个server的函数将被调用？
+>   1. Go中指定为Call()函数
+> 2. 序列化：格式数据转换成包
+>   1. 棘手的数组、指针、对象、&c
+>   2. Go的RPC库设计非常优秀
+>   3. 一些东西你无法传递：例如：通道、函数等
+> 3. 绑定：client如何知道与谁通信？
+>   1. client可以通过server的hostname
+>   2. 可能是service名称映射所有服务中的最好的host
 
 RPC problem: what to do about failures?
   e.g. lost packet, broken network, slow server, crashed server
+###　RPC问题：如何处理失败？
+> 例如：丢包，网络故障、服务端处理速度慢，服务端crash奔溃
 
 What does a failure look like to the client RPC library?
   Client never sees a response from the server
   Client does *not* know if the server saw the request!
     Maybe server/net failed just before sending reply
   [diagram of lost reply]
+### 失败对于client意味着什么？
+> 1. client没收接受到来自server的回应
+> 2. client是否server已经收到了请求request
+>   1. 有可能是server/net在发送reply回应之前发送失败
 
 Simplest scheme: "at least once" behavior
   RPC library waits for response for a while
   If none arrives, re-send the request
   Do this a few times
   Still no response -- return an error to the application
+### 最简单的模式：“至少一次”行为
+> 1. RPC库等待response回应一段时间
+> 2. 如果没有收到返回，则重新发送请求
+> 3. 重复上述多次
+> 4. 如果仍然没有回应--则直接返回error给应用程序处理
 
 Q: is "at least once" easy for applications to cope with?
+#### Q：“至少一次”对于应用程序是否容易处理？
 
 Simple problem w/ at least once:
   client sends "deduct $10 from bank account"
+#### 一个简单的“至少一次”问题：client发送“从银行账户减少10美元”
 
 Q: what can go wrong with this client program?
   Put("k", 10) -- an RPC to set key's value in a DB server
   Put("k", 20) -- client then does a 2nd Put to same key
   [diagram, timeout, re-send, original arrives very late]
+#### Q: 这个客户端程序会出现什么错误？
+> 1. Put("k", 10) --一个RPC调用在数据库服务器中设置键值对。
+> 2. Put("k",20) -- 客户端对同一个键设置其他值。
 
 Q: is at-least-once ever OK?
   yes: if it's OK to repeat operations, e.g. read-only op
   yes: if application has its own plan for coping w/ duplicates
     which you will need for Lab 1
+#### Q：“至少一次”一直能很好的工作？
+> 1. 是的：它比较适用重复操作，例如只读操作
+> 2. 是的：如果应用程序自己计划复制多个写副本（例如实验lab1）
 
 Better RPC behavior: "at most once"
   idea: server RPC code detects duplicate requests
@@ -302,6 +360,11 @@ Better RPC behavior: "at most once"
       r = handler()
       old[xid] = r
       seen[xid] = true
+### 更好的RPC行为：最多一次”
+> 1. 想法：server RPC代码处理重复的请求，返回之前的回应而不是重新处理
+> 2. Q：如何处理重复的请求？
+> 3. client拥有一个唯一的id对应每一个request请求，通过唯一的id来处理重新发送
+> 4. server: 如果已经计算过直接从old表中查找之前记录返回，否则直接计算，并保存此次记录。
 
 some at-most-once complexities
   this will come up in labs 3 and on
@@ -322,16 +385,39 @@ some at-most-once complexities
   how to handle dup req while original is still executing?
     server doesn't know reply yet; don't want to run twice
     idea: "pending" flag per executing RPC; wait or ignore
+### 关于"最多一次"的复杂些
+> 1. 这些将出现在lab3，以及如何确保XID的唯一性？
+>   1. 大的随机数
+>   1. 结合唯一的client id（例如ip地址）？
+> 2. server必须能够有能力评估及丢弃老的RPC请求信息
+>   1. 如何保证丢弃是安全的？
+>   1. 一些想法：
+>       1. 唯一的client id
+>       1. 每个client RPC序列号
+>       1. client的每一个RPC请求包含"seen all replies <=X"
+>       1. 类似tcp中的seq和ack
+>   1. 或者每次只允许一个RPC调用，到达的是seq+1，那么忽略其他小于seq
+>   1. 客户端最多可以尝试5分钟，服务器会忽略大于5分钟之后的请求。
+> 2. 当原来的请求还在执行，怎么样处理相同seq的请求？
+>   1. 服务器不想运行两次，也不想回复。
+>   1. 想法：给每个执行的RPC，pending标识；等待或者忽略。
+
 
 What if an at-most-once server crashes and re-starts?
   if at-most-once duplicate info in memory, server will forget
     and accept duplicate requests after re-start
   maybe it should write the duplicate info to disk?
   maybe replica server should also replicate duplicate info?
+### 如果“最多一次”的server奔溃或者重启？
+> 1. 如果服务器将副本信息保存在内存中，服务器会忘记请求，同时在重启之后接受相同的请求。
+> 2. 也许，你应该将副本信息保存到磁盘？
+> 3. 也许，副本服务器应该继续保存副本信息？
 
 What about "exactly once"?
   at-most-once plus unbounded retries plus fault-tolerant service
   Lab 3
+### 关于“恰好一次”？
+> 最多一次+无限重试+容错服务(Lab 3)
 
 Go RPC is "at-most-once"
   open TCP connection
@@ -342,6 +428,16 @@ Go RPC is "at-most-once"
     perhaps after a timeout (from TCP)
     perhaps server didn't see request
     perhaps server processed request but server/net failed before reply came back
+### Go RPC 采用“最多一次”模型
+> 1. 打开TCP链接
+> 1. 写入请求到TCP链接通道
+> 1. TCP可能会重传，但是服务端的TCP能够过滤重复请求
+> 1. Go 代码没有重试机制（例如：不会创建第二个TCP连接）
+> 1. Go RPC返回一个错误error，如果没有获取到回复
+>   1. 也许是超时之后
+>   1. 也许是服务器没有接收到请求
+>   1. 也许服务器处理完了请求，但是server/net在返回回复的时候发生故障
+
 
 Go RPC's at-most-once isn't enough for Lab 1
   it only applies to a single RPC call
@@ -350,3 +446,9 @@ Go RPC's at-most-once isn't enough for Lab 1
   Go RPC can't detect this kind of duplicate
     No problem in lab 1, which handles at application level
     Lab 3 will explicitly detect duplicates
+### Go RPC的“最多一次”不适应于Lab1
+> 1. 它只能够适用于单个RPC调用
+> 2. 如果worker没有回应，那么master将会重新发送job到其他worker,但是原来的worker并没有失败，且仍然在执行同一个job
+> 3. Go RPC 不能处理如下重复
+>   1. lab1中没有问题，lab1处理这些在应用程序级别
+>   2. lab3将需要明确的处理重复
