@@ -107,7 +107,7 @@ func client(key string, val string) {
 func TestRpc(t *testing.T) {
 	server()
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 6400; i++ {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
