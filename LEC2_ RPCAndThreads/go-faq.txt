@@ -1,0 +1,40 @@
+Q: When should we use Go channels as opposed to sync.Mutex?
+
+A: There is no clear answer to this question. If there's information
+that multiple goroutines need to use, and those goroutines don't
+specifically interact with each other, I tend to store the information
+in a shared data structure protected by locks. I use channels for
+producer-consumer interactions between goroutines, and when one
+goroutine needs to wait for another goroutine to do something.
+
+Q: Why does 6.824 use Go?
+
+A: Go is a good fit for distibuted systems programming: it supports
+concurrency well, it has a convenient RPC library, and it is
+garbage-collected. There are other languages that might work as well
+for 6.824, but Go was particularly fashionable when we were creating
+this set of labs. 6.824 used C++ before Go; C++ worked pretty well,
+but its lack of garbage collection made threaded code particularly
+bug-prone.
+
+Q: How can I wait for goroutines to finish?
+
+A: Try sync.WaitGroup. Or you could create a channel, have each
+goroutine send something on the channel when it finishes, and have the
+main goroutine wait for the appropriate number of channel messages.
+
+Q: Why is map not thread-safe?
+
+A: That is a bit of surprise to everyone who starts using Go. My guess
+is the designers didn't want programs to pay for locking for a map
+that isn't shared by multiple goroutines.
+
+Q: Why does Go have pointers, instead of just object references?
+
+A: The designers of Go intended it to be used for systems programming,
+where the programmer often wants control of how things are stored and
+passed around. For example, Java passes integers, references, etc. by
+value, which means that a callee cannot change the caller's value of
+the integer, reference, etc. In Go, a caller can pass a pointer to a
+variable to the callee, and the callee can use the pointer to modify
+the caller's variable.
