@@ -5,6 +5,8 @@
 > 4. [阅读A Tour of Go](https://tour.golang.org/welcome/1)
 > 5. [go-faq.txt](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go-faq.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo-faq.md&oid=069edc9588eea4d31410d791ac68ab8d4cc97fa4&sha=6c3f736d5b76322c2492a4275f745137cc277b97)
 > 6. [扩展资源：Effective Go中文版.pdf](https://git.oschina.net/tantexian/MIT6.824/raw/dev/docs/Effective%20Go%E4%B8%AD%E6%96%87%E7%89%88.pdf)
+> 7. [扩展资源：Golang内存模型(官方文档中英文翻译）](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_mem_model.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_mem_model.md&oid=1d6554a60b8a59d0a6be126356e04dfc405bf6d0&sha=80f489a4f27c4b551794d7fba60a4f67d6568515)
+> 7. [扩展资源：Golang数据竞态检测(官方文档中英文翻译)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_race_detector.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_race_detector.md&oid=04409064747458409c4606735ad42a2b465707f9&sha=80f489a4f27c4b551794d7fba60a4f67d6568515)
 
 本次课程主要学习了Go语言的基础知识、并发编程、RPC示例。以及“at least one”，“at most one”分布式系统设计要素及重难点。
 
