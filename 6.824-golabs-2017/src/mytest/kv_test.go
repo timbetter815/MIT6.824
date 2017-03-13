@@ -6,6 +6,8 @@ import (
 	"net"
 	"fmt"
 	"testing"
+	"time"
+	"strconv"
 )
 
 type PutArgs struct {
@@ -28,6 +30,11 @@ type PutReply struct {
 type KV struct {
 	lock  sync.Mutex
 	kvMap map[string]string
+}
+
+type GetRequest struct {
+	getArgs  *GetArgs
+	getReply *GetReply
 }
 
 func (kv *KV) Get(getArgs *GetArgs, getReply *GetReply) (error) {
@@ -69,16 +76,16 @@ func server() {
 	}()
 }
 
-func client() {
+func client(key string, val string) {
 	client, err := rpc.Dial("tcp", "127.0.0.1:51234")
 	if err != nil {
 		fmt.Printf("client Dial:%v", err)
 	}
-	putArgs := &PutArgs{"a", "a"}
+	putArgs := &PutArgs{key, val}
 	putReply := &PutReply{}
 	client.Call("KV.Put", putArgs, putReply)
 
-	getArgs := &GetArgs{"a"}
+	getArgs := &GetArgs{key}
 	getReply := &GetReply{""}
 	callErr := client.Call("KV.Get", getArgs, getReply)
 	if callErr == nil {
@@ -89,8 +96,24 @@ func client() {
 	}
 }
 
+/**
+ * 由于linux默认连接数为1024，因此需要重新设置
+ * echo 'ulimit -n 655350' >> /etc/profile
+ * echo "$USERNAME hard nofile 655350" >> /etc/security/limits.conf
+ * @author tantexian(https://my.oschina.net/tantexian/blog)
+ * @since 2017/3/13
+ * @params
+ */
 func TestRpc(t *testing.T) {
 	server()
-	client()
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10000; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			client(strconv.Itoa(index), time.Now().String())
+		}(i)
+	}
+	wg.Wait()
 }
 
