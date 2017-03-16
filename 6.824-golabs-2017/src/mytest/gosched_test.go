@@ -3,17 +3,20 @@ package mytest
 import (
 	"fmt"
 	"math/rand"
+	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
-var sched Sched
-var GOMAXPROCS = 100
-var nTasks = 10000
+var sched = new(Sched)
+var GOMAXPROCS = 20
+var nTasks = 100
 var doneTask = make([]int, 0)
+var doneTaskLock sync.Mutex
 
 // G 为goroutine接口
 type G interface {
@@ -28,8 +31,10 @@ type WorkTask struct {
 
 func (workTask *WorkTask) Run() {
 	fmt.Printf("%v %v I,m start workTask...\n", workTask.id, workTask.name)
+	doneTaskLock.Lock()
 	doneTask = append(doneTask, workTask.id)
-	workTime := time.Millisecond * time.Duration(rand.Intn(1000))
+	doneTaskLock.Unlock()
+	workTime := time.Microsecond * time.Duration(rand.Intn(10))
 	time.Sleep(workTime)
 	fmt.Printf("%v %v spend %v Millisecond\n", workTask.id, workTask.name, workTime)
 }
@@ -41,7 +46,9 @@ type Sched struct {
 }
 
 func (sched *Sched) add(goroutineTask G) {
+	sched.lock.Lock()
 	sched.GQueue = append(sched.GQueue, goroutineTask)
+	sched.lock.Unlock()
 }
 
 func allTaskDone() bool {
@@ -54,6 +61,7 @@ func allTaskDone() bool {
 
 // 代表machine机器线程，能进行任务调度运行
 func M() {
+	fmt.Printf("#### %v GroutineId=%v\n", time.Now(), GroutineId())
 	for {
 		sched.lock.Lock()
 		if len(sched.GQueue) > 0 {
@@ -78,23 +86,39 @@ func ProduceTaskToSched() {
 	}
 }
 
+func GroutineId() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.Atoi(idField)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
+}
+
 /**
  * 模拟go的线程调度模型：其中G、M分别对应上述数据结构，P对应为GOMAXPROCS
+ * 其中goroutine的工作模式概括：同时启动GOMAXPROCS个M同时并行不停地从Sched中的就绪GQueue列表中获取groutine执行。
  * @author tantexian
  * @since 2017/3/16
  * @params
  */
 func TestSched(t *testing.T) {
+	fmt.Printf("#### [%v]: TestSched GroutineId=%v\n", time.Now(), GroutineId())
 	go ProduceTaskToSched()
 	// GOMAXPROCS代表机器核数，即机器最大同时执行的线程数量
 	for i := 0; i < GOMAXPROCS; i++ {
 		go M()
 	}
 	for {
+		doneTaskLock.Lock()
 		if allTaskDone() {
 			fmt.Println("All task has done.")
 			break
 		}
+		doneTaskLock.Unlock()
+		fmt.Printf("[%v]: NumGoroutine=%v NumCPU=%v\n", time.Now(), runtime.NumGoroutine(), runtime.NumCPU())
 		time.Sleep(time.Second)
 	}
 
