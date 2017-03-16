@@ -1,13 +1,13 @@
 package mytest
 
 import (
-	"sync"
-	"net/rpc"
-	"net"
 	"fmt"
+	"net"
+	"net/rpc"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
-	"strconv"
 )
 
 type PutArgs struct {
@@ -37,14 +37,14 @@ type GetRequest struct {
 	getReply *GetReply
 }
 
-func (kv *KV) Get(getArgs *GetArgs, getReply *GetReply) (error) {
+func (kv *KV) Get(getArgs *GetArgs, getReply *GetReply) error {
 	kv.lock.Lock()
 	getReply.Val = kv.kvMap[getArgs.Key]
 	kv.lock.Unlock()
 	return nil
 }
 
-func (kv *KV) Put(putArgs *PutArgs, putReply *PutReply) (error) {
+func (kv *KV) Put(putArgs *PutArgs, putReply *PutReply) error {
 	kv.lock.Lock()
 	kv.kvMap[putArgs.Key] = putArgs.Val
 	putReply.Val = putArgs.Val
@@ -116,4 +116,3 @@ func TestRpc(t *testing.T) {
 	}
 	wg.Wait()
 }
-
