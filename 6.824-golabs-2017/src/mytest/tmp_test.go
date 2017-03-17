@@ -1,9 +1,10 @@
 package mytest
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 	"time"
+	"unsafe"
 )
 
 type T struct {
@@ -71,7 +72,7 @@ func Test3(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		fmt.Println(
 			pos(i),
-			neg(-2 * i),
+			neg(-2*i),
 		)
 	}
 }
@@ -94,4 +95,11 @@ func Test5(t *testing.T) {
 	a2 := adder2(100)
 	a3 := adder3(100)
 	fmt.Printf("a1=%v, a11=%v, a2=%v, a3=%v", a1, a11, a2, a3)
+}
+
+func Test6(t *testing.T) {
+	s := make([]int, 2)
+	p1 := &s[0]
+	ptr := unsafe.Pointer(&s[0])
+	fmt.Printf("s=%v, p1=%v, ptr=%v\n", s, p1, ptr)
 }
