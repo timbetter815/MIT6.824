@@ -6,13 +6,15 @@
 > 5. [6.824_Lab_2_Raft-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/6.824_Lab_2_Raft-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2F6.824_Lab_2_Raft-zh_cn.md&oid=381f13961fa57427ec0f746a20825cf1fa63da1e&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
 
 
-## 补充： 
+### 补充： 
 >   1. [GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/gfs.pdf)
  
 
 本次课程主要学习了GFS论文，及raft扩展论文及实现Raft实验。
 
-##### 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程本地查看全部原始资源！
+---------------------------------------------------------------------------------
+
+### 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程本地查看全部原始资源！
 PS：其中文件名相同，以.md结尾的为对应的中英文翻译markdown文件。
 
 

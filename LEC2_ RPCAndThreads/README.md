@@ -1,4 +1,4 @@
-#### 第2次课程学习顺序及相应课程资源:
+## 第2次课程学习顺序及相应课程资源:
 > 1. [Lecture 2: Infrastructure: RPC and threads ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/l-rpc.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fl-rpc.md&oid=d9882eaf0b502618b7791a710b17f64e39821aea&sha=3433911775cc3fa59246fa90478b30f322927c3f)
 > 2. [Crawler ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/crawler.go?dir=0&filepath=LEC2_+RPCAndThreads%2Fcrawler.go&oid=ff0cd66a881cd48c13635a5be87fdc69d9936330&sha=3433911775cc3fa59246fa90478b30f322927c3f)
 > 3. [K/V ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/kv.go?dir=0&filepath=LEC2_+RPCAndThreads%2Fkv.go&oid=3dfee994be6ddcd7c5df368cd9015cc76fba646a&sha=3433911775cc3fa59246fa90478b30f322927c3f)
@@ -10,7 +10,8 @@
 
 本次课程主要学习了Go语言的基础知识、并发编程、RPC示例。以及“at least one”，“at most one”分布式系统设计要素及重难点。
 
-##### 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程resources目录下本地查看全部资源！
+---------------------------------------------------------------------------------
+### 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程resources目录下本地查看全部资源！
 PS：其中文件名相同，以.md结尾的为对应的中英文翻译markdown文件。
 
 

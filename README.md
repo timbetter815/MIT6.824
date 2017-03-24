@@ -45,10 +45,43 @@ vim ~.bash_profile
 
 
 ---
-#### 第一次课程学习顺序及相应课程资源:
+## 第一次课程学习顺序及相应课程资源:
 > 1. [LEC 1: Introduction ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1_introduction%2F101.md&oid=b0d1831741f38a5f100a721b7e3cd9a69d709822&sha=b78bf6a66ea41b865876cf6fe0f065602c5e4eb7)
 > 2. [Preparation: Read MapReduce (2004) ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)
 > 3. [Assigned: Lab 1: MapReduce ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
+
+本次课程学习了MapReduce的论文及简单版本mapreduce相关实现。
+
+
+
+## 第2次课程学习顺序及相应课程资源:
+> 1. [Lecture 2: Infrastructure: RPC and threads ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/l-rpc.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fl-rpc.md&oid=d9882eaf0b502618b7791a710b17f64e39821aea&sha=3433911775cc3fa59246fa90478b30f322927c3f)
+> 2. [Crawler ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/crawler.go?dir=0&filepath=LEC2_+RPCAndThreads%2Fcrawler.go&oid=ff0cd66a881cd48c13635a5be87fdc69d9936330&sha=3433911775cc3fa59246fa90478b30f322927c3f)
+> 3. [K/V ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/kv.go?dir=0&filepath=LEC2_+RPCAndThreads%2Fkv.go&oid=3dfee994be6ddcd7c5df368cd9015cc76fba646a&sha=3433911775cc3fa59246fa90478b30f322927c3f)
+> 4. [阅读A Tour of Go ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://tour.golang.org/welcome/1)
+> 5. [go-faq.txt ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go-faq.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo-faq.md&oid=069edc9588eea4d31410d791ac68ab8d4cc97fa4&sha=6c3f736d5b76322c2492a4275f745137cc277b97)
+> 6. [扩展资源：Effective Go中文版.pdf ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/docs/Effective%20Go%E4%B8%AD%E6%96%87%E7%89%88.pdf)
+> 7. [扩展资源：Golang内存模型(官方文档中英文翻译）![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_mem_model.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_mem_model.md&oid=1d6554a60b8a59d0a6be126356e04dfc405bf6d0&sha=80f489a4f27c4b551794d7fba60a4f67d6568515)
+> 7. [扩展资源：Golang数据竞态检测(官方文档中英文翻译) ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_race_detector.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_race_detector.md&oid=04409064747458409c4606735ad42a2b465707f9&sha=80f489a4f27c4b551794d7fba60a4f67d6568515)
+
+本次课程主要学习了Go语言的基础知识、并发编程、RPC示例。以及“at least one”，“at most one”分布式系统设计要素及重难点。
+
+
+
+## 第3次课程学习顺序及相应课程资源:
+> 1. [l-gfs-short-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/l-gfs-short-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fl-gfs-short-zh_cn.md&oid=c9b89fca5b1d85f0e7f48a3c50e6eff7ec0334f3&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
+> 2. [Lecture 3: GFS论文 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/gfs-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fgfs-zh_cn.md&oid=4e69900cf9e548c526bb4981a97ee55dd0dbd55f&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
+> 3. [gfs-faq-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/gfs-faq-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fgfs-faq-zh_cn.md&oid=9c784174eae8abb6ec83a166a1794ec232a45717&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
+> 4. [raft-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/raft-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fraft-zh_cn.md&oid=665ca438613092ec8d9080c58184b360f840c5fd&sha=2ccc943ea154b0b5783772823671da262a7d48be)
+> 5. [6.824_Lab_2_Raft-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/6.824_Lab_2_Raft-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2F6.824_Lab_2_Raft-zh_cn.md&oid=381f13961fa57427ec0f746a20825cf1fa63da1e&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
+
+### 补充： 
+>   1. [GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/gfs.pdf)
+ 
+本次课程主要学习了GFS论文，及raft扩展论文及实现Raft实验。
+
+
+
 
 
 ---
