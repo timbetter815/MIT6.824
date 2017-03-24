@@ -4,11 +4,7 @@
 > 3. [gfs-faq-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/gfs-faq-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fgfs-faq-zh_cn.md&oid=9c784174eae8abb6ec83a166a1794ec232a45717&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
 > 4. [raft-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/raft-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fraft-zh_cn.md&oid=665ca438613092ec8d9080c58184b360f840c5fd&sha=2ccc943ea154b0b5783772823671da262a7d48be)
 > 5. [6.824_Lab_2_Raft-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/6.824_Lab_2_Raft-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2F6.824_Lab_2_Raft-zh_cn.md&oid=381f13961fa57427ec0f746a20825cf1fa63da1e&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
-
-
-### 补充： 
->   1. [GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/gfs.pdf)
- 
+> 6. [扩展资源：GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/gfs.pdf)
 
 本次课程主要学习了GFS论文，及raft扩展论文及实现Raft实验。
 
