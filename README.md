@@ -1,7 +1,7 @@
 #### 本项目主要针对自己对MIT6.824课程学习和翻译的记录，也方便后续其他学习者作为参考。
-有些内容也会记录在博客网址：[https://my.oschina.net/tantexian/blog](https://my.oschina.net/tantexian/blog)
+有些内容也会记录在博客网址：[https://my.oschina.net/tantexian/blog ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://my.oschina.net/tantexian/blog)
 
-### [MIT6.824网址](http://nil.csail.mit.edu/6.824/2017/)
+### [MIT6.824网址 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/)
 
 6.824: Distributed Systems
 
@@ -23,7 +23,7 @@ TR1-2:30, room 54-100
 * 2000 Web Site - 2016 Web Site：2000年-2016年以往6.824课程网址。
 
 ### 学习入门:
-该课程的学习入口：[Schedule入口：点击进入](http://nil.csail.mit.edu/6.824/2017/schedule.html)开始学习LEC1-LEC23以及课程学习资料。
+该课程的学习入口：[Schedule入口 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/schedule.html)开始学习LEC1-LEC23以及课程学习资料。
 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/scheduler-2017.png?dir=0&filepath=resources%2Fstatic%2Fimg%2Fscheduler-2017.png&oid=9c38ebc90be76b60603943bec0b9769289e6da86&sha=dec89cbe68c8c8eb7bd1a5020da1ec3bfe3a534d)
 
 
@@ -46,9 +46,9 @@ vim ~.bash_profile
 
 ---
 #### 第一次课程学习顺序及相应课程资源:
-> 1. [LEC 1: Introduction](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1_introduction%2F101.md&oid=b0d1831741f38a5f100a721b7e3cd9a69d709822&sha=b78bf6a66ea41b865876cf6fe0f065602c5e4eb7)
-> 2. [Preparation: Read MapReduce (2004)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)
-> 3. [Assigned: Lab 1: MapReduce](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
+> 1. [LEC 1: Introduction ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1_introduction%2F101.md&oid=b0d1831741f38a5f100a721b7e3cd9a69d709822&sha=b78bf6a66ea41b865876cf6fe0f065602c5e4eb7)
+> 2. [Preparation: Read MapReduce (2004) ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)
+> 3. [Assigned: Lab 1: MapReduce ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
 
 
 ---
@@ -133,5 +133,5 @@ vim ~.bash_profile
 
 
 >*联系方式：*
->博客网址：[https://my.oschina.net/tantexian/blog](https://my.oschina.net/tantexian/blog)
+>博客网址：[https://my.oschina.net/tantexian/blog ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://my.oschina.net/tantexian/blog)
 >邮箱：tantexian@qq.com
