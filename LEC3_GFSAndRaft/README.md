@@ -7,7 +7,7 @@
 
 
 ## 补充： 
->   1. [GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.png)
+>   1. [GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/gfs.pdf)
  
 
 本次课程主要学习了GFS论文，及raft扩展论文及实现Raft实验。
