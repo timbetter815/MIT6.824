@@ -132,8 +132,8 @@ vim ~.bash_profile
 * 注释类型3（适用于修改它人代码注释）、
 
 ```
-// xxx  Modify: tantexian, <my.oschina.net/tantexian> 2017/3/20 or v1.0.0 
-// xxx  Add: tantexian, <my.oschina.net/tantexian> 2017/3/20 or v1.0.0 
+// xxx  Modify: tantexian, <my.oschina.net/tantexian> Since: 2017/3/20 or v1.0.0 
+// xxx  Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/20 or v1.0.0 
 ```
   
 * 关于TODO、FIXME、XXX注释规范（后续再加上）、
