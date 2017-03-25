@@ -48,6 +48,7 @@ vim ~.bash_profile
 ## 第一次课程学习顺序及相应课程资源:
 > 1. [LEC 1: Introduction ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC1_introduction/101.md?dir=0&filepath=LEC1_introduction%2F101.md&oid=b0d1831741f38a5f100a721b7e3cd9a69d709822&sha=b78bf6a66ea41b865876cf6fe0f065602c5e4eb7)
 > 2. [Preparation: Read MapReduce (2004) ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/papers/mapreduce.pdf)
+　　　　[原始资源：MapReduce论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC1_introduction/mapreduce.pdf)
 > 3. [Assigned: Lab 1: MapReduce ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](http://nil.csail.mit.edu/6.824/2017/labs/lab-1.html)
 
 本次课程学习了MapReduce的论文及简单版本mapreduce相关实现。
@@ -71,10 +72,11 @@ vim ~.bash_profile
 ## 第3次课程学习顺序及相应课程资源:
 > 1. [l-gfs-short-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/l-gfs-short-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fl-gfs-short-zh_cn.md&oid=c9b89fca5b1d85f0e7f48a3c50e6eff7ec0334f3&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
 > 2. [Lecture 3: GFS论文 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/gfs-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fgfs-zh_cn.md&oid=4e69900cf9e548c526bb4981a97ee55dd0dbd55f&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
+　　　　[原始资源：GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/gfs.pdf)
 > 3. [gfs-faq-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/gfs-faq-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fgfs-faq-zh_cn.md&oid=9c784174eae8abb6ec83a166a1794ec232a45717&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
 > 4. [raft-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/raft-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2Fraft-zh_cn.md&oid=665ca438613092ec8d9080c58184b360f840c5fd&sha=2ccc943ea154b0b5783772823671da262a7d48be)
+　　　　[原始资源：raft论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/raft.pdf)
 > 5. [6.824_Lab_2_Raft-zh_cn.md ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC3_GFSAndRaft/6.824_Lab_2_Raft-zh_cn.md?dir=0&filepath=LEC3_GFSAndRaft%2F6.824_Lab_2_Raft-zh_cn.md&oid=381f13961fa57427ec0f746a20825cf1fa63da1e&sha=ed481bdbb6a41443aa2ce04390c44b9653ef0a78)
-> 6. [扩展资源：GFS论文英文文档 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/raw/dev/LEC3_GFSAndRaft/gfs.pdf)
 
 本次课程主要学习了GFS论文，及raft扩展论文及实现Raft实验。
 
@@ -83,7 +85,8 @@ vim ~.bash_profile
 
 
 ---
-##### PS:如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程MIT's_version目录下本地查看全部资源！
+## 如果有对应翻译文件，则链接到对应翻译地址，否则链接到mit网站地址，也可以直接在本项目对应课程目录下本地查看全部资源！
+## 翻译文档全部以zh_cn.md结尾。
 
 #### GOPATH环境配置：
 为了能够让6.824代码中能够正确导入对应的源码路径，因此本示例中将源码路径：C:\Users\ASUS\Desktop\dev\GOPATH\src\git.oschina.net\tantexian\MIT6.824\6.824-golabs-2017添加到GOPATH中
@@ -107,56 +110,53 @@ vim ~.bash_profile
 * 请在非主干分支上开发，禁止提交本地未测试运行通过代码到线上分支
 * 每次提交及之前(正常来说需要先pull --rebase,解决冲突)，对代码进行修改必须有相对应的解释说明
 * 正常组内开发人员提交代码，需要经过经过审核后方可提交（且需要有统一格式注释，参照注释类型3）
-
+  
 
 
 ### 注释规范
 * 对于注释，请遵照以下规范：
-* 注释类型1、
+* 注释类型1（适用于结构体或者包名注释）、
 
 ```
-/**
- * 顺序消息的生产者（顺序消息的消费者与普通消费者一致）
- *
- * @author xxx
- * @since 2016/6/27
- * @params ctx：Context类型上下文
- */
+// 方法对象名 xxx
+// Author: xxx, <my.oschina.net/tantexian/blog>
+// Since: 2017/3/20 or v1.0.0 
 ```
 
-* 注释类型2、
+* 注释类型2（适用于功能确定的单行注释）、
 
 ```
 // 由于是顺序消息，因此只能选择一个queue生产和消费消息
 ```
 
-* 注释类型3、
+* 注释类型3（适用于修改它人代码注释）、
 
 ```
-// xxx 2016/7/11 Add by xxx Or // xxx 2016/7/11 Edit by xxx
+// xxx  Modify: xxx, <my.oschina.net/tantexian/blog> 2017/3/20 or v1.0.0 
+// xxx  Add: xxx, <my.oschina.net/tantexian/blog> 2017/3/20 or v1.0.0 
 ```
-
-* 关于TODO、FIXME、XXX注释规范、
+  
+* 关于TODO、FIXME、XXX注释规范（后续再加上）、
 
 ```
-// TODO: + 说明：
+// TODO: + 说明：xxx Author: xxx, <my.oschina.net/tantexian/blog>  Since: 2017/3/20 or v1.0.0 
 ```
 如果代码中有TODO该标识，说明在标识处有功能代码待编写，待实现的功能在说明中会简略说明。
 
 ```
-// FIXME: + 说明：
+// FIXME: + 说明：xxx Author: xxx, <my.oschina.net/tantexian/blog>  Since: 2017/3/20 or v1.0.0 
 ```
 如果代码中有FIXME该标识，说明标识处代码需要修正，甚至代码是错误的，不能工作，需要修复，如何修正会在说明中简略说明。
 
 ```
-// XXX: + 说明：
+// XXX: + 说明：xxx Author: xxx, <my.oschina.net/tantexian/blog>  Since: 2017/3/20 or v1.0.0 
 ```
 如果代码中有XXX该标识，说明标识处代码虽然实现了功能，但是实现的方法有待商榷，希望将来能改进，要改进的地方会在说明中简略说明。
 
 
 
 ### 开发IDE
-* 开发工具不做统一规定（Idea、Eclipse都可以），建议使用Idea按照golang插件
+* 开发工具不做统一规定（Idea、Eclipse都可以），建议使用Idea
 * 建议使用最新版格式Idea，附下载地址：http://pan.baidu.com/s/1slMkXY1
 * 附Idea属性格式注释文件下载地址：http://pan.baidu.com/s/1hrU3IgW（其中java版本Idea使用zz或者zzz命令来生成注释，golang使用gg或者ggg）
 

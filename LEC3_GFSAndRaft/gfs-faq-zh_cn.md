@@ -61,7 +61,7 @@ will be modified and one can avoid making some copies.
 > 但是会增加每一个chunk的引用计数。这样使得创建一个快照成本更低。
 > 2. 如果客户端对chunk进行写入操作且master通知引用计数超过一，
 > 那么master首先创建一个复制副本使得客户端能够更新副本（而不是chunk的快照的一部分）
-> 你能够观察这些将会延时复制知道真的必要。
+> 你能够观察这些将会延时复制直到真的必要。
 > 3. 意愿：并不是所有的块将被修改,可以避免副本复制。
 
 Q: If an application uses the standard POSIX file APIs, would it need
