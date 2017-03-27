@@ -35,6 +35,15 @@ type ApplyMsg struct {
 	Snapshot    []byte // ignore for lab2; only used in lab3
 }
 
+// Log 日志条目数据结构
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/27
+type Log struct {
+	command interface{}
+	term    int
+	index   int
+}
+
 //
 // A Go object implementing a single Raft peer.
 //
@@ -47,6 +56,10 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
+	currentTerm int // 任期（第一次启动初始化为0，后续单调递增）
+	votedFor    int // 当前任期接收选票的候选人id(如果没有则设置为null, 由于golang的int不能赋值为null，因此变为-1)
+	log         []*Log
 }
 
 // return currentTerm and whether this server
@@ -97,6 +110,11 @@ func (rf *Raft) readPersist(data []byte) {
 //
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
+	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
+	Term         int // 候选人的任期
+	CandidateId  int // 候选人id
+	LastLogIndex int // 候选人最后日志条目索引
+	LastLogTerm  int // 候选人最后日志条目任期
 }
 
 //
@@ -105,6 +123,9 @@ type RequestVoteArgs struct {
 //
 type RequestVoteReply struct {
 	// Your data here (2A).
+	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
+	Term        int  // 当前的任期（用于候选人更新自己的任期）
+	VoteGranted bool // true代表候选人接收到选票
 }
 
 //
@@ -112,6 +133,17 @@ type RequestVoteReply struct {
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
+	reply.Term = rf.currentTerm
+	if args.Term < rf.currentTerm {
+		reply.VoteGranted = false
+	}
+
+	// 如果当前候选人votedFor为-1
+	if rf.votedFor == -1 || // 或者等于当前请求投票的候选人
+		rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
+		(args.LastLogTerm == rf.log[len(rf.log)-1].term && args.LastLogIndex == rf.log[len(rf.log)-1].index) {
+		reply.VoteGranted = true
+	}
 }
 
 //
@@ -200,6 +232,14 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	// Your initialization code here (2A, 2B, 2C).
+	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
+	rf.currentTerm = 0
+	rf.votedFor = -1
+
+	go func() {
+		msg := <-applyCh
+		fmt.Printf("msg == %v\n", msg)
+	}()
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())

@@ -103,3 +103,16 @@ func Test6(t *testing.T) {
 	ptr := unsafe.Pointer(&s[0])
 	fmt.Printf("s=%v, p1=%v, ptr=%v\n", s, p1, ptr)
 }
+
+type X struct {
+	a int
+}
+
+func Test7(t *testing.T) {
+	x := &X{}
+	fmt.Printf("x.a == %v", x.a)
+	x.a = nil
+	/*if x.a == nil {
+
+	}*/
+}
