@@ -18,7 +18,10 @@ package raft
 //
 
 import "sync"
-import "labrpc"
+import (
+	"fmt"
+	"labrpc"
+)
 
 // import "bytes"
 // import "encoding/gob"
@@ -35,14 +38,24 @@ type ApplyMsg struct {
 	Snapshot    []byte // ignore for lab2; only used in lab3
 }
 
-// Log 日志条目数据结构
+// Log 日志条目数据结构,contains command for state machine, and term when entry was received by leader (first index is 1)
 // Author: tantexian, <my.oschina.net/tantexian>
-// Since: 2017/3/27
-type Log struct {
+// Since: 2017/327
+type LogEntry struct {
 	command interface{}
 	term    int
 	index   int
 }
+
+// 用于定义Raft中，代表候选人id为空是的none值 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
+const none = -1
+
+// 增加Raft的status Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
+const (
+	StatusFollower  = 1 // 跟随者
+	StatusCandidate = 2 // 候选者
+	StatusLeader    = 3 // 领导人
+)
 
 //
 // A Go object implementing a single Raft peer.
@@ -57,9 +70,48 @@ type Raft struct {
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
+	// Persistent state on all servers:(Updated on stable storage before responding to RPCs)
 	currentTerm int // 任期（第一次启动初始化为0，后续单调递增）
-	votedFor    int // 当前任期接收选票的候选人id(如果没有则设置为null, 由于golang的int不能赋值为null，因此变为-1)
-	log         []*Log
+	votedFor    int // 当前任期接收选票的候选人id(如果没有则设置为none，用常量-1代替)
+	logs        []*LogEntry
+
+	// Volatile state on all servers:
+	commitIndex int // index of highest log entry known to be committed (initialized to 0, increases monotonically)
+	lastApplied int // index of highest log entry applied to state machine (initialized to 0, increases monotonically)
+
+	// Volatile state on leaders:(Reinitialized after election)
+	nextIndex  []int // for each server, index of the next log entry to send to that server (initialized to leader last log index + 1)
+	matchIndex []int // for each server, index of highest log entry known to be replicated on server(initialized to 0, increases monotonically)
+
+	status int // 此处用（const StatusFollower、StatusCandidate、StatusLeader表示）
+}
+
+// GetLastLogTerm 获取raft最后日志条目的任期
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+func (rf *Raft) GetLastLogTerm() (term int) {
+	len := len(rf.logs)
+	if len == 0 {
+		fmt.Printf("raft's has no logs, raft == %v\n", rf)
+		term = none
+		return
+	}
+	term = rf.logs[len-1].term
+	return term
+}
+
+// GetLastLogIndex 获取raft最后日志条目的index
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+func (rf *Raft) GetLastLogIndex() (index int) {
+	len := len(rf.logs)
+	if len == 0 {
+		fmt.Printf("raft's has no logs, raft == %v\n", rf)
+		index = none
+		return index
+	}
+	index = rf.logs[len-1].index
+	return index
 }
 
 // return currentTerm and whether this server
@@ -69,6 +121,10 @@ func (rf *Raft) GetState() (int, bool) {
 	var term int
 	var isleader bool
 	// Your code here (2A).
+	term = rf.currentTerm
+	if rf.status == StatusLeader {
+		isleader = true
+	}
 	return term, isleader
 }
 
@@ -141,7 +197,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// 如果当前候选人votedFor为-1
 	if rf.votedFor == -1 || // 或者等于当前请求投票的候选人
 		rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
-		(args.LastLogTerm == rf.log[len(rf.log)-1].term && args.LastLogIndex == rf.log[len(rf.log)-1].index) {
+		(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
 		reply.VoteGranted = true
 	}
 }
@@ -234,15 +290,54 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// Your initialization code here (2A, 2B, 2C).
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
 	rf.currentTerm = 0
-	rf.votedFor = -1
+	rf.votedFor = none
+	rf.logs = make([]*LogEntry, 0)
 
-	go func() {
-		msg := <-applyCh
-		fmt.Printf("msg == %v\n", msg)
-	}()
+	rf.commitIndex = none
+	rf.lastApplied = none
+
+	// 使用goroutine，for循环处理状态变化及选举
+	go func(rf *Raft) {
+		for {
+			switch rf.status {
+			case StatusFollower:
+
+			}
+		}
+	}(rf)
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
 	return rf
+}
+
+type AppendEntries struct {
+}
+
+// AppendEntriesArgs AppendEntries函数的RPC请求参数
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+type AppendEntriesArgs struct {
+	Term         int        // 领导人的任期
+	LeaderId     int        // 领导人id，so follower can redirect clients
+	PrevLogIndex int        // index of log entry immediately preceding new ones
+	PrevLogTerm  int        // term of prevLogIndex entry
+	Entries      []LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
+	LeaderCommit int        // leader’s commitIndex
+}
+
+// AppendEntriesReply AppendEntries函数的RPC回复参数
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+type AppendEntriesReply struct {
+	Term    int  // currentTerm, for leader to update itself
+	Success bool // true if follower contained entry matching prevLogIndex and prevLogTerm
+}
+
+// AppendEntries 添加日志条目，Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+
 }
