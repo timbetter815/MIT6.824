@@ -21,7 +21,7 @@ This is the first in a series of labs in which you'll build a
 fault-tolerant key/value storage system. In this
 lab you'll implement Raft, a replicated state machine protocol.
 In the next lab you'll build a key/value service on top of
-Raft. Then you will “shard” your service over
+Raft. Then you will ï¿½shardï¿½ your service over
 multiple replicated state machines for higher performance.
 
 </p><p>
@@ -200,7 +200,7 @@ rf.GetState() (term, isLeader)
 type ApplyMsg</pre>
 
 <p>
-A service calls <tt>Make(peers,me,…)</tt> to create a
+A service calls <tt>Make(peers,me,ï¿½)</tt> to create a
 Raft peer. The peers argument is an array of established RPC
 connections, one to each Raft peer (including this one). The
 <tt>me</tt> argument is the index of this peer in the peers
@@ -476,7 +476,7 @@ and <tt>raft.go</tt> contains examples of how to save and
 restore persistent state.
 
 </p><p>
-A “real” implementation would do this by writing
+A ï¿½realï¿½ implementation would do this by writing
 Raft's persistent state to disk each time it changes, and reading the latest saved
 state from
 disk when restarting after a reboot. Your implementation won't use

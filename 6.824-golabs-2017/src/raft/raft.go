@@ -21,6 +21,7 @@ import "sync"
 import (
 	"fmt"
 	"labrpc"
+	"sync/atomic"
 	"time"
 )
 
@@ -52,10 +53,12 @@ type LogEntry struct {
 const none = -1
 
 // 增加Raft的status Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
+type RaftState int
+
 const (
-	StatusFollower  = 1 // 跟随者
-	StatusCandidate = 2 // 候选者
-	StatusLeader    = 3 // 领导人
+	StateFollower  RaftState = iota // 跟随者
+	StateCandidate                  // 跟随者
+	StateLeader                     // 跟随者
 )
 
 //
@@ -72,9 +75,9 @@ type Raft struct {
 	// state a Raft server must maintain.
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
 	// Persistent state on all servers:(Updated on stable storage before responding to RPCs)
-	currentTerm int // 任期（第一次启动初始化为0，后续单调递增）
-	votedFor    int // 当前任期接收选票的候选人id(如果没有则设置为none，用常量-1代替)
-	logs        []*LogEntry
+	currentTerm int         // 任期（第一次启动初始化为0，后续单调递增）
+	votedFor    int         // 当前任期接收选票的候选人id(如果没有则设置为none，用常量-1代替)
+	logs        []*LogEntry //log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
 
 	// Volatile state on all servers:
 	commitIndex int // index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -84,7 +87,7 @@ type Raft struct {
 	nextIndex  []int // for each server, index of the next log entry to send to that server (initialized to leader last log index + 1)
 	matchIndex []int // for each server, index of highest log entry known to be replicated on server(initialized to 0, increases monotonically)
 
-	status int // 此处用（const StatusFollower、StatusCandidate、StatusLeader表示）
+	state RaftState // 此处用type RaftState int表示跟随者，候选者、领导人
 
 	heartbearCh chan string // 此处用于接收其他raft的心跳信息
 }
@@ -95,7 +98,7 @@ type Raft struct {
 func (rf *Raft) GetLastLogTerm() (term int) {
 	len := len(rf.logs)
 	if len == 0 {
-		fmt.Printf("raft's has no logs, raft == %v\n", rf)
+		fmt.Printf("raft[%v] has no logs", rf.me)
 		term = none
 		return
 	}
@@ -109,7 +112,7 @@ func (rf *Raft) GetLastLogTerm() (term int) {
 func (rf *Raft) GetLastLogIndex() (index int) {
 	len := len(rf.logs)
 	if len == 0 {
-		fmt.Printf("raft's has no logs, raft == %v\n", rf)
+		fmt.Printf("raft[%v] has no logs\n", rf.me)
 		index = none
 		return index
 	}
@@ -125,7 +128,7 @@ func (rf *Raft) GetState() (int, bool) {
 	var isleader bool
 	// Your code here (2A).
 	term = rf.currentTerm
-	if rf.status == StatusLeader {
+	if rf.state == StateLeader {
 		isleader = true
 	}
 	return term, isleader
@@ -199,8 +202,8 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// 如果当前候选人votedFor为-1
 	if rf.votedFor == -1 || // 或者等于当前请求投票的候选人
-			rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
-			(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
+		rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
+		(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
 		reply.VoteGranted = true
 	}
 }
@@ -239,19 +242,16 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
-type AppendEntries struct {
-}
-
 // AppendEntriesArgs AppendEntries函数的RPC请求参数
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/28
 type AppendEntriesArgs struct {
-	Term         int        // 领导人的任期
-	LeaderId     int        // 领导人id，so follower can redirect clients
-	PrevLogIndex int        // index of log entry immediately preceding new ones
-	PrevLogTerm  int        // term of prevLogIndex entry
-	Entries      []LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
-	LeaderCommit int        // leader’s commitIndex
+	Term         int         // 领导人的任期
+	LeaderId     int         // 领导人id，so follower can redirect clients
+	PrevLogIndex int         // index of log entry immediately preceding new ones
+	PrevLogTerm  int         // term of prevLogIndex entry
+	Entries      []*LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
+	LeaderCommit int         // leader’s commitIndex
 }
 
 // AppendEntriesReply AppendEntries函数的RPC回复参数
@@ -265,25 +265,50 @@ type AppendEntriesReply struct {
 // AppendEntries AppendEntries RPC handler.
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/29
-func (rf *Raft) AppendEntries(args *RequestVoteArgs, reply *RequestVoteReply) {
-	// Your code here (2A, 2B).
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	reply.Term = rf.currentTerm
+	if args.Entries == nil {
+		rf.heartbearCh <- time.Now().String()
+		fmt.Printf("raft:%v heartbeat fill to heartbearCh.\n", rf.me)
+	}
+	if rf.GetLastLogIndex() == args.PrevLogIndex && rf.GetLastLogTerm() == args.PrevLogTerm {
+		reply.Success = true
+	}
 	if args.Term < rf.currentTerm {
-		reply.VoteGranted = false
+		reply.Success = false
+	}
+	length := len(rf.logs)
+	if length >= args.PrevLogIndex && rf.logs[args.PrevLogIndex].term != args.PrevLogTerm {
+		reply.Success = false
+	}
+	entries := args.Entries
+	if entries != nil {
+		for i := 0; i < len(entries); i++ {
+			for j := len(rf.logs); j > 0; j-- {
+				if rf.logs[j].index == entries[i].index && rf.logs[j].term != entries[i].term {
+					rf.logs = rf.logs[0: len(rf.logs)-2]
+				}
+			}
+		}
+		for i := 0; i < len(entries); i++ {
+			rf.logs = append(rf.logs, entries[i])
+		}
+	}
+	if args.LeaderCommit > rf.commitIndex {
+		index1 := entries[len(entries)-1].index
+		if index1 < args.LeaderCommit {
+			rf.commitIndex = index1
+		} else {
+			rf.commitIndex = args.LeaderCommit
+		}
 	}
 
-	// 如果当前候选人votedFor为-1
-	if rf.votedFor == -1 || // 或者等于当前请求投票的候选人
-			rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
-			(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
-		reply.VoteGranted = true
-	}
 }
 
 // AppendEntries send a RequestVote RPC to a server.添加日志条目，Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/28
-func (rf *Raft) SendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
 	return ok
 }
@@ -321,6 +346,60 @@ func (rf *Raft) Kill() {
 	// Your code here, if desired.
 }
 
+// 处理状态变化及选举 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/29
+func (rf *Raft) handleElection() {
+	for {
+		switch rf.state {
+		case StateFollower:
+			select {
+			case heartbeat := <-rf.heartbearCh:
+				fmt.Printf("raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
+			case <-time.After(500 * time.Millisecond):
+				rf.currentTerm++
+				rf.votedFor = rf.me
+				rf.state = StateCandidate
+				fmt.Printf("raft[%v] does not receive heartbeat, and switch to StateCandidate.\n", rf.me)
+			}
+		case StateCandidate:
+			var voteNum int32 = 0
+			requestVoteArgs := &RequestVoteArgs{
+				Term:         rf.currentTerm,
+				CandidateId:  rf.me,
+				LastLogIndex: rf.GetLastLogIndex(),
+				LastLogTerm:  rf.GetLastLogTerm()}
+			for i := 0; i < len(rf.peers)-1; i++ {
+				go func(server int) {
+					requestVoteReply := &RequestVoteReply{}
+					ok := rf.sendRequestVote(i, requestVoteArgs, requestVoteReply)
+					if ok && requestVoteReply.VoteGranted {
+						atomic.AddInt32(&voteNum, 1)
+					}
+					if int(voteNum) > len(rf.peers)/2 {
+						rf.state = StateLeader
+						fmt.Printf("raft[%v] has get majority votes, and switch to StateLeader.\n", rf.me)
+					}
+				}(i)
+			}
+		case StateLeader:
+			for {
+				for i := 0; i < len(rf.peers)-1; i++ {
+					appendEntriesArgs := &AppendEntriesArgs{
+						Term:     rf.currentTerm,
+						LeaderId: rf.me,
+						Entries:  nil}
+					appendEntriesReply := &AppendEntriesReply{}
+
+					go func() {
+						rf.sendAppendEntries(i, appendEntriesArgs, appendEntriesReply)
+					}()
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+
+		}
+	}
+}
+
 //
 // the service or tester wants to create a Raft server. the ports
 // of all the Raft servers (including this one) are in peers[]. this
@@ -333,7 +412,7 @@ func (rf *Raft) Kill() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-		persister *Persister, applyCh chan ApplyMsg) *Raft {
+	persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
@@ -341,6 +420,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// Your initialization code here (2A, 2B, 2C).
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
+	rf.state = StateFollower // 初始状态为跟随者
 	rf.currentTerm = 0
 	rf.votedFor = none
 	rf.logs = make([]*LogEntry, 0)
@@ -348,16 +428,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.commitIndex = none
 	rf.lastApplied = none
 
-	// 使用goroutine，for循环处理状态变化及选举
-	go func(rf *Raft) {
-		for {
-			switch rf.status {
-			case StatusFollower:
-				time.AfterFunc()
-
-			}
-		}
-	}(rf)
+	// 使用goroutine，处理状态变化及选举
+	go rf.handleElection()
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
