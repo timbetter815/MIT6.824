@@ -21,6 +21,7 @@ import "sync"
 import (
 	"fmt"
 	"labrpc"
+	"time"
 )
 
 // import "bytes"
@@ -84,6 +85,8 @@ type Raft struct {
 	matchIndex []int // for each server, index of highest log entry known to be replicated on server(initialized to 0, increases monotonically)
 
 	status int // 此处用（const StatusFollower、StatusCandidate、StatusLeader表示）
+
+	heartbearCh chan string // 此处用于接收其他raft的心跳信息
 }
 
 // GetLastLogTerm 获取raft最后日志条目的任期
@@ -196,8 +199,8 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// 如果当前候选人votedFor为-1
 	if rf.votedFor == -1 || // 或者等于当前请求投票的候选人
-		rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
-		(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
+			rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
+			(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
 		reply.VoteGranted = true
 	}
 }
@@ -236,6 +239,55 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
+type AppendEntries struct {
+}
+
+// AppendEntriesArgs AppendEntries函数的RPC请求参数
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+type AppendEntriesArgs struct {
+	Term         int        // 领导人的任期
+	LeaderId     int        // 领导人id，so follower can redirect clients
+	PrevLogIndex int        // index of log entry immediately preceding new ones
+	PrevLogTerm  int        // term of prevLogIndex entry
+	Entries      []LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
+	LeaderCommit int        // leader’s commitIndex
+}
+
+// AppendEntriesReply AppendEntries函数的RPC回复参数
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+type AppendEntriesReply struct {
+	Term    int  // currentTerm, for leader to update itself
+	Success bool // true if follower contained entry matching prevLogIndex and prevLogTerm
+}
+
+// AppendEntries AppendEntries RPC handler.
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/29
+func (rf *Raft) AppendEntries(args *RequestVoteArgs, reply *RequestVoteReply) {
+	// Your code here (2A, 2B).
+	reply.Term = rf.currentTerm
+	if args.Term < rf.currentTerm {
+		reply.VoteGranted = false
+	}
+
+	// 如果当前候选人votedFor为-1
+	if rf.votedFor == -1 || // 或者等于当前请求投票的候选人
+			rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
+			(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
+		reply.VoteGranted = true
+	}
+}
+
+// AppendEntries send a RequestVote RPC to a server.添加日志条目，Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).
+// Author: tantexian, <my.oschina.net/tantexian>
+// Since: 2017/3/28
+func (rf *Raft) SendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	return ok
+}
+
 //
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
@@ -248,7 +300,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 // if it's ever committed. the second return value is the current
 // term. the third return value is true if this server believes it is
 // the leader.
-//
+// 询问Raft启动一个进程将命令添加到副本log中
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	index := -1
 	term := -1
@@ -281,7 +333,7 @@ func (rf *Raft) Kill() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-	persister *Persister, applyCh chan ApplyMsg) *Raft {
+		persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
@@ -301,6 +353,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		for {
 			switch rf.status {
 			case StatusFollower:
+				time.AfterFunc()
 
 			}
 		}
@@ -310,34 +363,4 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.readPersist(persister.ReadRaftState())
 
 	return rf
-}
-
-type AppendEntries struct {
-}
-
-// AppendEntriesArgs AppendEntries函数的RPC请求参数
-// Author: tantexian, <my.oschina.net/tantexian>
-// Since: 2017/3/28
-type AppendEntriesArgs struct {
-	Term         int        // 领导人的任期
-	LeaderId     int        // 领导人id，so follower can redirect clients
-	PrevLogIndex int        // index of log entry immediately preceding new ones
-	PrevLogTerm  int        // term of prevLogIndex entry
-	Entries      []LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
-	LeaderCommit int        // leader’s commitIndex
-}
-
-// AppendEntriesReply AppendEntries函数的RPC回复参数
-// Author: tantexian, <my.oschina.net/tantexian>
-// Since: 2017/3/28
-type AppendEntriesReply struct {
-	Term    int  // currentTerm, for leader to update itself
-	Success bool // true if follower contained entry matching prevLogIndex and prevLogTerm
-}
-
-// AppendEntries 添加日志条目，Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).
-// Author: tantexian, <my.oschina.net/tantexian>
-// Since: 2017/3/28
-func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
-
 }

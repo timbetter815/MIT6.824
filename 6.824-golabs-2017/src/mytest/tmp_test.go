@@ -111,7 +111,7 @@ type X struct {
 func Test7(t *testing.T) {
 	x := &X{}
 	fmt.Printf("x.a == %v", x.a)
-	x.a = nil
+//	x.a = nil
 	/*if x.a == nil {
 
 	}*/
