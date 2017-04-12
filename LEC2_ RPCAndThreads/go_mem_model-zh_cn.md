@@ -223,7 +223,7 @@ with the same guaranteed behavior.
 
 A receive from an unbuffered channel happens before the send on
 that channel completes.
-> A接收一个无缓冲的通道信号先于发送，当通道完成。
+> 从无缓冲channel中接收操作 发生在该channel的发送操作结束前
 
 This program (as above, but with the send and receive statements swapped
 and using an unbuffered channel):
