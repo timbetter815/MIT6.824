@@ -1,11 +1,11 @@
 package mytest
 
 import (
-	"sync"
 	"fmt"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
-	"strconv"
 )
 
 /**
@@ -13,7 +13,7 @@ import (
  * @since 2017/3/6
  * @params
  */
-type  MyLock struct {
+type MyLock struct {
 	a    int
 	lock *sync.Mutex
 }
@@ -83,52 +83,48 @@ func Test_OBJLock(t *testing.T) {
 }
 
 var rwlock sync.RWMutex
-var a3 string
+var str3 string
 
-func f3() {
+func fun3() {
 	time.Sleep(100 * time.Millisecond)
-	a3 = "hello, world"
+	str3 = "hello, world"
 	rwlock.Unlock()
 
 }
 
-func f4() {
+func fun4() {
 	time.Sleep(100 * time.Millisecond)
-	a3 = "hello, world2"
+	str3 = "hello, world2"
 	rwlock.Lock()
 
 }
 
 func TestRWMutex(t *testing.T) {
 	rwlock.Lock()
-	go f3()
-	go f4()
-	a3 = "hello, world3"
-	rwlock.RLock() // 这是第n(1)次出现RLock，应该要先于第n+1(2)次lock的发生，即应该先于f4中的lock之前发生。
-	print(a3)
+	go fun3()
+	go fun4()
+	str3 = "hello, world3"
+	rwlock.RLock() // 这是第n(1)次出现RLock，应该要先于第n+1(2)次lock的发生，即应该先于fun4中的lock之前发生。
+	print(str3)
 }
-
 
 var l sync.Mutex
 var a1 string
 
 // 由于unlock在a1赋值之前，因此主线程可能看不到a1赋值的值
-func f1() {
+func fun1() {
 	l.Unlock()
 	time.Sleep(100 * time.Millisecond)
 	a1 = "hello, world"
 
 }
 
-
 func TestMutex1(t *testing.T) {
 	l.Lock()
-	go f1()
+	go fun1()
 	l.Lock()
 	print(a1)
 }
-
-
 
 func f2() {
 	a1 = "hello, world"
@@ -145,7 +141,6 @@ func TestMutex2(t *testing.T) {
 	print(a1)
 	time.Sleep(time.Second)
 }
-
 
 var a111 string
 
@@ -190,4 +185,3 @@ func TestLimit(t *testing.T) {
 	wg.Wait()
 	// select {}
 }
-
