@@ -187,6 +187,11 @@ func f8() {
 // 对于任意 sync.Mutex 或 sync.RWMutex 变量l。
 // 如果 n < m ，那么第n次 l.Unlock() happens before 第m次l.Lock()调用返回。
 
+// Golang 内存模型规则7：
+// 对于读写锁任何调用变量l的RLock，
+// 第n次调用l.RLock必定发生在第n次l.Unlock之后,
+// 与之相对应的l.RUnlock必定发生在第n+1次l.Lock之前。
+
 // 同一个互斥变量的解锁 happen-before 与该变量的下一次加锁（先发生解锁，再发生加锁）
 // 对同一个变量lock的解锁n次和加锁操作m次，
 // 如果n<m,即解锁次数1小于加锁次数2，因此解锁操作先于加锁操作完成
@@ -196,4 +201,42 @@ func Test_main8(t *testing.T) {
 	go f8()
 	lock.Lock()
 	print(a8)
+}
+
+//--------------------------------示例9代码分割线----------------------------------
+var rwLock sync.RWMutex
+var a9 string
+
+func f9() {
+	a9 = "hello, world rwLock a9  "
+	rwLock.Unlock() // 第n次l.Unlock happen-before 第n次调用l.RLock
+}
+
+func f91() {
+	a9 = "hello, world rwLock a9 change again !!!\n"
+	rwLock.RUnlock() // 与之相对应的n次l.RUnlock happen-before 第n+1次l.Lock
+}
+
+// Golang 内存模型规则7：
+// For any call to l.RLock on a sync.RWMutex variable l,
+// there is an n such that the l.RLock happens (returns) after the n'th call to l.Unlock
+// and the matching l.RUnlock happens before the n+1'th call to l.Lock.
+// 对于读写锁任何调用变量l的RLock，
+// 第n次调用l.RLock必定发生在第n次l.Unlock之后,
+// 与之相对应的l.RUnlock必定发生在第n+1次l.Lock之前。
+
+// 对于读写锁任何调用变量l,第n次Unlock happen-before 第n次RLock（Lock()、Unlock()必须成对出现）
+// 即对读写锁加读写锁Lock()，必须等到该读写锁Unlock()解锁完，才能进行加读锁RLock()
+func Test_main9(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		rwLock.Lock()
+		go f9()
+		rwLock.RLock()
+		print(a9)
+
+		go f91()
+		rwLock.Lock()
+		print(a9)
+		rwLock.Unlock()
+	}
 }
