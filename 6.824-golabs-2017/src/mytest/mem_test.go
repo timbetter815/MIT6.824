@@ -173,3 +173,27 @@ func Test_main7(t *testing.T) {
 	wg.Wait()
 	// select {}
 }
+
+//--------------------------------示例8代码分割线----------------------------------
+var lock sync.Mutex
+var a8 string
+
+func f8() {
+	a8 = "hello, world lock"
+	lock.Unlock()
+}
+
+// Golang 内存模型规则6：
+// 对于任意 sync.Mutex 或 sync.RWMutex 变量l。
+// 如果 n < m ，那么第n次 l.Unlock() happens before 第m次l.Lock()调用返回。
+
+// 同一个互斥变量的解锁 happen-before 与该变量的下一次加锁（先发生解锁，再发生加锁）
+// 对同一个变量lock的解锁n次和加锁操作m次，
+// 如果n<m,即解锁次数1小于加锁次数2，因此解锁操作先于加锁操作完成
+// 即f8函数的unlock先于第二个lock完成，而第二个lock又先于print完成，因此保证a1的赋值能被打印出来
+func Test_main8(t *testing.T) {
+	lock.Lock()
+	go f8()
+	lock.Lock()
+	print(a8)
+}
