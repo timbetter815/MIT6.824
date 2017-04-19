@@ -285,8 +285,9 @@ func main() {
 	}
 	select{}
 }
-Locks
 ````
+## Locks
+
 The sync package implements two lock data types, sync.Mutex and sync.RWMutex.
 > sync包实现了两种类型的锁：互斥锁及读写锁
 
