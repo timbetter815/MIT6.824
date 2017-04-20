@@ -40,7 +40,8 @@ type ApplyMsg struct {
 	Snapshot    []byte // ignore for lab2; only used in lab3
 }
 
-// Log 日志条目数据结构,contains command for state machine, and term when entry was received by leader (first index is 1)
+// Log 日志条目数据结构,
+// contains command for state machine, and term when entry was received by leader (first index is 1)
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/327
 type LogEntry struct {
@@ -49,7 +50,7 @@ type LogEntry struct {
 	index   int
 }
 
-// 用于定义Raft中，代表候选人id为空是的none值 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
+// 用于定义Raft中，代表候选人id为空时的none值 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
 const none = -1
 
 // 增加Raft的status Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
@@ -57,8 +58,8 @@ type RaftState int
 
 const (
 	StateFollower  RaftState = iota // 跟随者
-	StateCandidate                  // 跟随者
-	StateLeader                     // 跟随者
+	StateCandidate                  // 候选人
+	StateLeader                     // 领导者
 )
 
 //
@@ -89,7 +90,7 @@ type Raft struct {
 
 	state RaftState // 此处用type RaftState int表示跟随者，候选者、领导人
 
-	heartbearCh chan string // 此处用于接收其他raft的心跳信息
+	heartbeatCh chan string // 此处用于接收其他raft的心跳信息
 }
 
 // GetLastLogTerm 获取raft最后日志条目的任期
@@ -100,7 +101,7 @@ func (rf *Raft) GetLastLogTerm() (term int) {
 	if len == 0 {
 		fmt.Printf("raft[%v] has no logs", rf.me)
 		term = none
-		return
+		return term
 	}
 	term = rf.logs[len-1].term
 	return term
@@ -200,10 +201,9 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		reply.VoteGranted = false
 	}
 
-	// 如果当前候选人votedFor为-1
-	if rf.votedFor == -1 || // 或者等于当前请求投票的候选人
-		rf.votedFor == args.CandidateId || //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
-		(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
+	if rf.votedFor == -1 || // 如果当前候选人votedFor为-1
+			rf.votedFor == args.CandidateId || // 或者等于当前请求投票的候选人
+			(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) { //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
 		reply.VoteGranted = true
 	}
 }
@@ -268,8 +268,8 @@ type AppendEntriesReply struct {
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	reply.Term = rf.currentTerm
 	if args.Entries == nil {
-		rf.heartbearCh <- time.Now().String()
-		fmt.Printf("raft:%v heartbeat fill to heartbearCh.\n", rf.me)
+		rf.heartbeatCh <- time.Now().String()
+		fmt.Printf("raft:%v heartbeat fill to heartbeatCh.\n", rf.me)
 	}
 	if rf.GetLastLogIndex() == args.PrevLogIndex && rf.GetLastLogTerm() == args.PrevLogTerm {
 		reply.Success = true
@@ -352,8 +352,9 @@ func (rf *Raft) handleElection() {
 		switch rf.state {
 		case StateFollower:
 			select {
-			case heartbeat := <-rf.heartbearCh:
+			case heartbeat := <-rf.heartbeatCh:
 				fmt.Printf("raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
+			// 如果超过500毫秒未收到心跳信息，则切换状态为候选人
 			case <-time.After(500 * time.Millisecond):
 				rf.currentTerm++
 				rf.votedFor = rf.me
@@ -367,31 +368,46 @@ func (rf *Raft) handleElection() {
 				CandidateId:  rf.me,
 				LastLogIndex: rf.GetLastLogIndex(),
 				LastLogTerm:  rf.GetLastLogTerm()}
-			for i := 0; i < len(rf.peers)-1; i++ {
+			// 并行向其他服务器发送请求投票RPCs
+			rfLen := len(rf.peers)
+			for i := 0; i < rfLen; i++ {
+				wg := sync.WaitGroup{}
+				wg.Add(rfLen)
+
+				if i == rf.me { // 不需要向自己发送请求投票RPCs
+					wg.Done()
+					continue
+				}
 				go func(server int) {
 					requestVoteReply := &RequestVoteReply{}
-					ok := rf.sendRequestVote(i, requestVoteArgs, requestVoteReply)
+					ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
 					if ok && requestVoteReply.VoteGranted {
 						atomic.AddInt32(&voteNum, 1)
 					}
-					if int(voteNum) > len(rf.peers)/2 {
+					wg.Done()
+				}(i)
+				// 当获得超过半数选票时，立马切换为leader
+				if rf.state != StateLeader {
+					if int(voteNum) > rfLen/2 {
 						rf.state = StateLeader
 						fmt.Printf("raft[%v] has get majority votes, and switch to StateLeader.\n", rf.me)
 					}
-				}(i)
+				}
+				wg.Wait()
 			}
 		case StateLeader:
 			for {
-				for i := 0; i < len(rf.peers)-1; i++ {
+				rfLen := len(rf.peers)
+				for i := 0; i < rfLen; i++ {
 					appendEntriesArgs := &AppendEntriesArgs{
 						Term:     rf.currentTerm,
 						LeaderId: rf.me,
 						Entries:  nil}
 					appendEntriesReply := &AppendEntriesReply{}
 
-					go func() {
-						rf.sendAppendEntries(i, appendEntriesArgs, appendEntriesReply)
-					}()
+					go func(server int) {
+						rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
+					}(i)
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
@@ -412,7 +428,7 @@ func (rf *Raft) handleElection() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-	persister *Persister, applyCh chan ApplyMsg) *Raft {
+		persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
@@ -425,8 +441,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.votedFor = none
 	rf.logs = make([]*LogEntry, 0)
 
-	rf.commitIndex = none
-	rf.lastApplied = none
+	rf.commitIndex = 0
+	rf.lastApplied = 0
 
 	// 使用goroutine，处理状态变化及选举
 	go rf.handleElection()
