@@ -2,6 +2,7 @@ The Go Memory Model
 # Golang内存模型(官方文档中英文翻译）
 [点击：更多详情请前往博客地址](https://my.oschina.net/tantexian)
 [点击：或者git地址](https://git.oschina.net/tantexian/MIT6.824/blob/dev/LEC2_%20RPCAndThreads/go_mem.md?dir=0&filepath=LEC2_+RPCAndThreads%2Fgo_mem.md&oid=5fca03003d6e62f098716d7bfbd9fb7be91ec3d1&sha=4d19b0880fadc8c2a63696ec736cac5eafa99c03)
+[点击: Go Memory Model 示例代码 ![](https://git.oschina.net/tantexian/MIT6.824/raw/dev/resources/static/img/click.jpg)](https://git.oschina.net/tantexian/MIT6.824/blob/dev/6.824-golabs-2017/src/mytest/mem_test.go?dir=0&filepath=6.824-golabs-2017%2Fsrc%2Fmytest%2Fmem_test.go&oid=180dc8be3f38c1996293098eb8a55e6bdbcd51b9&sha=473914894c0eae52cd3904b4d110d3ff4be9cd36)
 
 Version of May 31, 2014
 
