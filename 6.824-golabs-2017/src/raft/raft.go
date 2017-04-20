@@ -99,7 +99,7 @@ type Raft struct {
 func (rf *Raft) GetLastLogTerm() (term int) {
 	len := len(rf.logs)
 	if len == 0 {
-		fmt.Printf("raft[%v] has no logs", rf.me)
+		// fmt.Printf("raft[%v] has no logs\n", rf.me)
 		term = none
 		return term
 	}
@@ -113,7 +113,7 @@ func (rf *Raft) GetLastLogTerm() (term int) {
 func (rf *Raft) GetLastLogIndex() (index int) {
 	len := len(rf.logs)
 	if len == 0 {
-		fmt.Printf("raft[%v] has no logs\n", rf.me)
+		// fmt.Printf("raft[%v] has no logs\n", rf.me)
 		index = none
 		return index
 	}
@@ -201,9 +201,10 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		reply.VoteGranted = false
 	}
 
-	if rf.votedFor == -1 || // 如果当前候选人votedFor为-1
-			rf.votedFor == args.CandidateId || // 或者等于当前请求投票的候选人
-			(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) { //或者当前请求投票的候选人的日志和rf的日志一样新，则投票
+	// 如果当前候选人votedFor为-1 或者votedFor等于当前请求投票的候选人
+	if (rf.votedFor == -1 || rf.votedFor == args.CandidateId) &&
+	//且当前请求投票的候选人的日志和rf的日志一样新，则投票
+		(args.LastLogTerm == rf.GetLastLogTerm() && args.LastLogIndex == rf.GetLastLogIndex()) {
 		reply.VoteGranted = true
 	}
 }
@@ -266,6 +267,7 @@ type AppendEntriesReply struct {
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/29
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+	fmt.Printf("====%v", rf)
 	reply.Term = rf.currentTerm
 	if args.Entries == nil {
 		rf.heartbeatCh <- time.Now().String()
@@ -346,6 +348,16 @@ func (rf *Raft) Kill() {
 	// Your code here, if desired.
 }
 
+// 当获得超过半数选票时，立马切换为leader
+func (rf *Raft) getMajorityVotesAndToLeader(voteNum int32) {
+	if rf.state != StateLeader {
+		if int(voteNum) > len(rf.peers)/2 {
+			rf.state = StateLeader
+			fmt.Printf("raft[%v] has get majority votes[%v], peers[%v] and switch to StateLeader.\n", rf.me, voteNum, len(rf.peers))
+		}
+	}
+}
+
 // 处理状态变化及选举 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/29
 func (rf *Raft) handleElection() {
 	for {
@@ -370,11 +382,12 @@ func (rf *Raft) handleElection() {
 				LastLogTerm:  rf.GetLastLogTerm()}
 			// 并行向其他服务器发送请求投票RPCs
 			rfLen := len(rf.peers)
+			wg := sync.WaitGroup{}
+			wg.Add(rfLen)
 			for i := 0; i < rfLen; i++ {
-				wg := sync.WaitGroup{}
-				wg.Add(rfLen)
 
 				if i == rf.me { // 不需要向自己发送请求投票RPCs
+					atomic.AddInt32(&voteNum, 1) // 给自己投票
 					wg.Done()
 					continue
 				}
@@ -386,19 +399,20 @@ func (rf *Raft) handleElection() {
 					}
 					wg.Done()
 				}(i)
+
 				// 当获得超过半数选票时，立马切换为leader
-				if rf.state != StateLeader {
-					if int(voteNum) > rfLen/2 {
-						rf.state = StateLeader
-						fmt.Printf("raft[%v] has get majority votes, and switch to StateLeader.\n", rf.me)
-					}
-				}
-				wg.Wait()
+				rf.getMajorityVotesAndToLeader(voteNum)
 			}
+			// 最后确保所有goroutine投票得出统计票数，再确认一次
+			wg.Wait()
+			rf.getMajorityVotesAndToLeader(voteNum)
 		case StateLeader:
 			for {
 				rfLen := len(rf.peers)
 				for i := 0; i < rfLen; i++ {
+					if i == rf.me { // 不需要向自己发送心跳消息
+						continue
+					}
 					appendEntriesArgs := &AppendEntriesArgs{
 						Term:     rf.currentTerm,
 						LeaderId: rf.me,
@@ -428,7 +442,7 @@ func (rf *Raft) handleElection() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-		persister *Persister, applyCh chan ApplyMsg) *Raft {
+	persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
