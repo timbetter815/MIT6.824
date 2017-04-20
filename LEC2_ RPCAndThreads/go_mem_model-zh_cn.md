@@ -326,7 +326,7 @@ and the matching l.RUnlock happens before call n+1 to l.Lock.
 > 对于任何调用变量l的RLock，第n次调用l.RLock必定发生在第n次l.Unlock之后,
 与之相对应的l.RUnlock必定发生在第n+1次l.Lock之前。
 
-Once
+## Once
 ## 一次执行
 
 The sync package provides a safe mechanism for initialization in the presence of multiple goroutines
