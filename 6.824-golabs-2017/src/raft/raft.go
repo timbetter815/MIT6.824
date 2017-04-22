@@ -200,11 +200,18 @@ type RequestVoteReply struct {
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// fmt.Printf("## RequestVote start %+v , args == %+v replay == %+v\n", rf, args, reply)
 	// Your code here (2A, 2B).
+
+	// If RPC request or response contains term T > currentTerm:
+	// set currentTerm = T, convert to follower (§5.1)
+	if args.Term > rf.currentTerm {
+		rf.currentTerm = args.Term
+	}
+
 	reply.Term = rf.currentTerm
 	// Reply false if term < currentTerm (§5.1)
 	if args.Term < rf.currentTerm {
 		reply.VoteGranted = false
-		//fmt.Printf("---------------- RequestVote fails [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
+		// fmt.Printf("---------------- RequestVote fails [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
 		return
 	}
 
@@ -216,10 +223,10 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
 		rf.votedFor = args.CandidateId
 		reply.VoteGranted = true
-		//fmt.Printf("---------------- RequestVote success [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
+		// fmt.Printf("---------------- RequestVote success [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
 		return
 	} else {
-		//fmt.Printf("---------------- RequestVote 111fails [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
+		// fmt.Printf("---------------- RequestVote else fails [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
 		reply.VoteGranted = false
 		return
 	}
@@ -282,18 +289,25 @@ type AppendEntriesReply struct {
 // AppendEntries AppendEntries RPC handler.
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/29
-func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) {
 	/*fmt.Printf("AppendEntries rf ====%v\n", rf)
-	fmt.Printf("args====%v\n", args)
+	fmt.Printf("args====%v\n", args.Entries)
 	fmt.Printf("reply====%v\n", reply)*/
+
+	// If RPC request or response contains term T > currentTerm:
+	// set currentTerm = T, convert to follower (§5.1)
+	if args.Term > rf.currentTerm {
+		rf.currentTerm = args.Term
+	}
+
+	rf.state = StateFollower
 
 	// currentTerm, for leader to update itself
 	reply.Term = rf.currentTerm
 	// 如果Entries为空，则表示心跳信息
-	if args.Entries == nil {
-		fmt.Printf("rf.heartbeatCh ============ %v\n", rf.heartbeatCh)
+	if len(args.Entries) == 0 {
+		// fmt.Printf("send heartbeat to %v\n", rf.me)
 		rf.heartbeatCh <- time.Now().String()
-		fmt.Printf("raft:%v heartbeat fill to heartbeatCh.\n", rf.me)
 		return // TODO：心跳信息则直接返回？
 	}
 
@@ -360,7 +374,7 @@ appendFlag:
 // Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/28
-func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+func (rf *Raft) sendAppendEntries(server int, args AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
 	return ok
 }
@@ -414,16 +428,19 @@ func (rf *Raft) handleElection() {
 		switch rf.state {
 		case StateFollower:
 			select {
-			case heartbeat := <-rf.heartbeatCh:
-				fmt.Printf("raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
+			case /*heartbeat := */ <-rf.heartbeatCh:
+
+			// fmt.Printf("raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
 			// 如果超过500毫秒未收到心跳信息，则切换状态为候选人
 			case <-time.After(500 * time.Millisecond):
-				rf.currentTerm++
+				// rf.currentTerm++
 				// rf.votedFor = rf.me
 				rf.state = StateCandidate
 				fmt.Printf("raft[%v] does not receive heartbeat, and switch to StateCandidate.\n", rf.me)
 			}
 		case StateCandidate: // TODO: 候选者收到心跳？？？
+			rf.currentTerm++
+
 			var voteNum int32 = 0
 			requestVoteArgs := &RequestVoteArgs{
 				Term:         rf.currentTerm,
@@ -445,6 +462,13 @@ func (rf *Raft) handleElection() {
 				go func(server int) {
 					requestVoteReply := &RequestVoteReply{}
 					ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
+
+					// If RPC request or response contains term T > currentTerm:
+					// set currentTerm = T, convert to follower (§5.1)
+					if requestVoteReply.Term > rf.currentTerm {
+						rf.currentTerm = requestVoteReply.Term
+					}
+
 					if ok && requestVoteReply.VoteGranted {
 						atomic.AddInt32(&voteNum, 1)
 						fmt.Printf("Gather Votes: [%v to %v term %v] voteNum == %v\n", server, rf.me, rf.currentTerm, voteNum)
@@ -458,17 +482,15 @@ func (rf *Raft) handleElection() {
 			// 最后确保所有goroutine投票得出统计票数，再确认一次
 			wg.Wait()
 			rf.gatherVotesChangeToLeader(voteNum)
+			rf.votedFor = none
+
 			// 第三种可能的结果是候选人既没有赢得选举也没有输：如果有多个跟随者同时成为候选人，
 			// 那么选票可能会被瓜分以至于没有候选人可以赢得大多数人的支持。当这种情况发生的时候，
 			// 每一个候选人都会超时，然后通过增加当前任期号来开始一轮新的选举。然而，没有其他机制的话，
 			// 选票可能会被无限的重复瓜分。
 			// 为了阻止选票起初就被瓜分，选举超时时间是从一个固定的区间（例如 150-300毫秒）随机选择。
-			if rf.state == StateCandidate {
-				rf.votedFor = none
-				rf.currentTerm++
-				randTime := rand.Int()%150 + 150
-				time.Sleep(time.Duration(randTime) * time.Millisecond)
-			}
+			randTime := rand.Int()%150 + 150
+			time.Sleep(time.Duration(randTime) * time.Millisecond)
 		case StateLeader:
 			rfLen := len(rf.peers)
 			for i := 0; i < rfLen; i++ {
@@ -476,15 +498,20 @@ func (rf *Raft) handleElection() {
 					continue
 				}
 
-				appendEntriesArgs := &AppendEntriesArgs{
+				appendEntriesArgs := AppendEntriesArgs{
 					Term:     rf.currentTerm,
 					LeaderId: rf.me,
 					Entries:  nil}
 
 				go func(server int) {
 					appendEntriesReply := &AppendEntriesReply{}
-					fmt.Printf("to server %v appendEntriesArgs == %+v\n", server, appendEntriesArgs)
 					rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
+
+					// If RPC request or response contains term T > currentTerm:
+					// set currentTerm = T, convert to follower (§5.1)
+					if appendEntriesReply.Term > rf.currentTerm {
+						rf.currentTerm = appendEntriesReply.Term
+					}
 				}(i)
 			}
 			time.Sleep(10 * time.Millisecond)
