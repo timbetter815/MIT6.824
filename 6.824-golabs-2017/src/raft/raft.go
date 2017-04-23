@@ -198,20 +198,15 @@ type RequestVoteReply struct {
 // example RequestVote RPC handler.
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	// fmt.Printf("## RequestVote start %+v , args == %+v replay == %+v\n", rf, args, reply)
+	//fmt.Printf("## RequestVote start %+v , args == %+v replay == %+v\n", rf, args, reply)
 	// Your code here (2A, 2B).
-
-	// If RPC request or response contains term T > currentTerm:
-	// set currentTerm = T, convert to follower (§5.1)
-	if args.Term > rf.currentTerm {
-		rf.currentTerm = args.Term
-	}
+	rf.resetCurrentTerm(args.Term)
 
 	reply.Term = rf.currentTerm
 	// Reply false if term < currentTerm (§5.1)
 	if args.Term < rf.currentTerm {
 		reply.VoteGranted = false
-		// fmt.Printf("---------------- RequestVote fails [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
+		fmt.Printf("** fails RequestVote  [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
 		return
 	}
 
@@ -221,12 +216,14 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	if (rf.votedFor == none || rf.votedFor == args.CandidateId) &&
 	//且当前请求投票的候选人的日志和rf的日志(至少)一样新，则投票
 		(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
+		rf.mu.Lock()
 		rf.votedFor = args.CandidateId
+		rf.mu.Unlock()
 		reply.VoteGranted = true
-		// fmt.Printf("---------------- RequestVote success [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
+		fmt.Printf("|| success RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
 		return
 	} else {
-		// fmt.Printf("---------------- RequestVote else fails [%v to %v] args == %v reply==%v\n", rf.me, args.CandidateId, args, reply)
+		fmt.Printf("** fails else RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
 		reply.VoteGranted = false
 		return
 	}
@@ -294,16 +291,27 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	fmt.Printf("args====%v\n", args.Entries)
 	fmt.Printf("reply====%v\n", reply)*/
 
-	// If RPC request or response contains term T > currentTerm:
-	// set currentTerm = T, convert to follower (§5.1)
-	if args.Term > rf.currentTerm {
-		rf.currentTerm = args.Term
-	}
-
-	rf.state = StateFollower
-
+	fmt.Printf("args====%+v\n", args)
+	fmt.Printf("reply====%+v\n", reply)
 	// currentTerm, for leader to update itself
 	reply.Term = rf.currentTerm
+
+	// 1. Reply false if term < currentTerm (§5.1)
+	if args.Term < rf.currentTerm {
+		fmt.Printf("[rf=%+v] AppendEntries args.Term %v < rf.currentTerm %v\n", rf.me, args.Term, rf.currentTerm)
+		reply.Success = false
+		return
+	}
+
+	rf.resetCurrentTerm(args.Term)
+
+	rf.state = StateFollower
+	if rf.votedFor != none {
+		rf.mu.Lock()
+		rf.votedFor = none
+		rf.mu.Unlock()
+	}
+
 	// 如果Entries为空，则表示心跳信息
 	if len(args.Entries) == 0 {
 		// fmt.Printf("send heartbeat to %v\n", rf.me)
@@ -311,11 +319,6 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		return // TODO：心跳信息则直接返回？
 	}
 
-	// 1. Reply false if term < currentTerm (§5.1)
-	if args.Term < rf.currentTerm {
-		reply.Success = false
-		return
-	}
 	// 2. Reply false if log doesn’t contain an entry at prevLogIndex
 	// whose term matches prevLogTerm (§5.3)
 	length := len(rf.logs)
@@ -413,11 +416,30 @@ func (rf *Raft) Kill() {
 }
 
 // 当获得超过半数选票时，立马切换为leader
-func (rf *Raft) gatherVotesChangeToLeader(voteNum int32) {
+func (rf *Raft) gatherVotesChangeToLeader(voteNum int32) bool {
+	success := true
 	if rf.state != StateLeader {
 		if int(voteNum) > len(rf.peers)/2 {
+			rf.mu.Lock()
 			rf.state = StateLeader
+			rf.mu.Unlock()
 			fmt.Printf("raft[%v] has gather majority votes[%v], term[%v], peers[%v] and switch to StateLeader.\n", rf.me, voteNum, rf.currentTerm, len(rf.peers))
+		} else {
+			success = false
+		}
+	}
+	return success
+}
+
+func (rf *Raft) resetCurrentTerm(term int) {
+	// If RPC request or response contains term T > currentTerm:
+	// set currentTerm = T, convert to follower (§5.1)
+	if term > rf.currentTerm {
+		rf.currentTerm = term
+		if rf.state != StateFollower {
+			rf.mu.Lock()
+			rf.state = StateFollower
+			rf.mu.Unlock()
 		}
 	}
 }
@@ -428,20 +450,26 @@ func (rf *Raft) handleElection() {
 		switch rf.state {
 		case StateFollower:
 			select {
-			case /*heartbeat := */ <-rf.heartbeatCh:
+			case <-rf.heartbeatCh:
+			// rf.votedFor = none // TODO:正常在StateFollower状态，votedFor== none？？？
 
 			// fmt.Printf("raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
 			// 如果超过500毫秒未收到心跳信息，则切换状态为候选人
 			case <-time.After(500 * time.Millisecond):
-				// rf.currentTerm++
-				// rf.votedFor = rf.me
+				rf.mu.Lock()
 				rf.state = StateCandidate
+				rf.mu.Unlock()
 				fmt.Printf("raft[%v] does not receive heartbeat, and switch to StateCandidate.\n", rf.me)
 			}
 		case StateCandidate: // TODO: 候选者收到心跳？？？
+			rf.mu.Lock()
+			rf.votedFor = rf.me
+			// 任期加1
 			rf.currentTerm++
+			rf.mu.Unlock()
 
 			var voteNum int32 = 0
+
 			requestVoteArgs := &RequestVoteArgs{
 				Term:         rf.currentTerm,
 				CandidateId:  rf.me,
@@ -452,23 +480,15 @@ func (rf *Raft) handleElection() {
 			wg := sync.WaitGroup{}
 			wg.Add(rfLen)
 			for i := 0; i < rfLen; i++ {
-
 				if i == rf.me { // 不需要向自己发送请求投票RPCs
 					atomic.AddInt32(&voteNum, 1) // 给自己投票
-					rf.votedFor = rf.me
 					wg.Done()
 					continue
 				}
 				go func(server int) {
 					requestVoteReply := &RequestVoteReply{}
 					ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
-
-					// If RPC request or response contains term T > currentTerm:
-					// set currentTerm = T, convert to follower (§5.1)
-					if requestVoteReply.Term > rf.currentTerm {
-						rf.currentTerm = requestVoteReply.Term
-					}
-
+					rf.resetCurrentTerm(requestVoteReply.Term)
 					if ok && requestVoteReply.VoteGranted {
 						atomic.AddInt32(&voteNum, 1)
 						fmt.Printf("Gather Votes: [%v to %v term %v] voteNum == %v\n", server, rf.me, rf.currentTerm, voteNum)
@@ -476,21 +496,34 @@ func (rf *Raft) handleElection() {
 					wg.Done()
 				}(i)
 
-				/*// 当获得超过半数选票时，立马切换为leader
-				rf.gatherVotesChangeToLeader(voteNum)*/
+				/*// 当获得超过半数选票时，立马切换为leader,由于goroutine执行很快，此处一般不会进入？
+				if rf.gatherVotesChangeToLeader(voteNum) {
+					// 如果获取超过半数选票，切换为leader，且不需要等待其他投票结果
+					*//*restDone := rfLen - i
+					wg.Add(-restDone)*//*
+					fmt.Printf("???1------------\n")
+					break
+				}*/
 			}
-			// 最后确保所有goroutine投票得出统计票数，再确认一次
+			// 最后确保所有goroutine投票得出统计票数
 			wg.Wait()
 			rf.gatherVotesChangeToLeader(voteNum)
+
+			// 如果自己当选为leader或者进行下一轮候选人选举，votedFor都应该设置为none
+			rf.mu.Lock()
 			rf.votedFor = none
+			rf.mu.Unlock()
 
 			// 第三种可能的结果是候选人既没有赢得选举也没有输：如果有多个跟随者同时成为候选人，
 			// 那么选票可能会被瓜分以至于没有候选人可以赢得大多数人的支持。当这种情况发生的时候，
 			// 每一个候选人都会超时，然后通过增加当前任期号来开始一轮新的选举。然而，没有其他机制的话，
 			// 选票可能会被无限的重复瓜分。
 			// 为了阻止选票起初就被瓜分，选举超时时间是从一个固定的区间（例如 150-300毫秒）随机选择。
-			randTime := rand.Int()%150 + 150
-			time.Sleep(time.Duration(randTime) * time.Millisecond)
+
+			if rf.state == StateCandidate { // 只有当获取leader选票失败，再次选举才需要随机延时
+				randTime := rand.Int()%150 + 150
+				time.Sleep(time.Duration(randTime) * time.Millisecond)
+			}
 		case StateLeader:
 			rfLen := len(rf.peers)
 			for i := 0; i < rfLen; i++ {
@@ -504,17 +537,13 @@ func (rf *Raft) handleElection() {
 					Entries:  nil}
 
 				go func(server int) {
-					appendEntriesReply := &AppendEntriesReply{}
+					appendEntriesReply := &AppendEntriesReply{888, true}
+					fmt.Printf("send heartbeat %+v to %v\n", rf, server)
 					rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
-
-					// If RPC request or response contains term T > currentTerm:
-					// set currentTerm = T, convert to follower (§5.1)
-					if appendEntriesReply.Term > rf.currentTerm {
-						rf.currentTerm = appendEntriesReply.Term
-					}
+					rf.resetCurrentTerm(appendEntriesReply.Term)
 				}(i)
 			}
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
