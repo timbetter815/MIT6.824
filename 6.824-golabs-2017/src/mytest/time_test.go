@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"math/rand"
 )
 
 func TestTime1(t *testing.T) {
@@ -43,4 +44,29 @@ func TestTime2(t *testing.T) {
 
 	time.Sleep(60 * time.Second)
 	fmt.Printf("main is exit: %v\n", time.Now())
+}
+
+func TestTime3(t *testing.T) {
+	fmt.Printf("start time == %v\n", time.Now())
+
+	success := make(chan bool)
+
+	for index := 0; index < 10; index++ {
+		time.Sleep(1 * time.Second)
+		go func() {
+			if rand.Int()%5 == 0 {
+				//success <- true
+			}
+		}()
+
+	}
+
+	select {
+	case y := <-success:
+		fmt.Printf("success %v\n", y)
+	case x := <-time.After(2 * time.Second):
+		fmt.Printf("[%v] timeout == %v\n", x, time.Now()) // 立即输出
+	}
+
+	fmt.Printf("end time == %v\n", time.Now()) // 立即输出
 }

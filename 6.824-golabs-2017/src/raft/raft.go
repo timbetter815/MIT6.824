@@ -61,7 +61,7 @@ const (
 	// candidate and start an election. ElectionTick must be greater than
 	// HeartbeatTick. We suggest ElectionTick = 10 * HeartbeatTick to avoid
 	// unnecessary leader switching.
-	ElectionTimeoutTick int = 500
+	ElectionTimeoutTick int = 400
 	// HeartbeatTick is the number of Node.Tick invocations that must pass between
 	// heartbeats. That is, a leader sends heartbeat messages to maintain its
 	// leadership every HeartbeatTick ticks.
@@ -235,7 +235,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// 接收选票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
 	if args.Term > rf.currentTerm {
-		DPrintf("[SWITCHSTATE: %v->StateFollower]: raft[%v] receive RequestVote other raft Term(%v) > self Term(%v).\n", rf.state, rf.me, args.Term, rf.currentTerm)
+		DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive RequestVote other raft Term(%v) > self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
 		rf.mu.Lock()
 		rf.currentTerm = args.Term
 		rf.state = StateFollower
@@ -338,7 +338,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		reply.Success = false
 		return
 	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term,则设置自己的Term，且切换为StateFollower
-		DPrintf("[SWITCHSTATE: %v->StateFollower]: raft[%v] receive AppendEntries other raft Term(%v) > self Term(%v).\n", rf.state, rf.me, args.Term, rf.currentTerm)
+		DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive AppendEntries other raft Term(%v) > self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
 		rf.mu.Lock()
 		rf.currentTerm = args.Term
 		rf.state = StateFollower
@@ -457,7 +457,7 @@ func (rf *Raft) gatherVotesChangeToLeader(voteNum int32) bool {
 			rf.mu.Lock()
 			rf.state = StateLeader
 			rf.mu.Unlock()
-			DPrintf("[SWITCHSTATE: %v->StateLeader]: raft[%v] has gather majority votes[%v], term[%v], peers[%v].\n", rf.state, rf.me, voteNum, rf.currentTerm, len(rf.peers))
+			DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes[%v], term[%v], peers[%v].\n", rf.me, voteNum, rf.currentTerm, len(rf.peers))
 		} else {
 			success = false
 		}
@@ -504,7 +504,7 @@ func (rf *Raft) handleElection() {
 				rf.mu.Lock()
 				rf.state = StateCandidate
 				rf.mu.Unlock()
-				DPrintf("[SWITCHSTATE: %v->StateCandidate]: raft[%v] does not receive heartbeat.\n", rf.state, rf.me)
+				DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] does not receive heartbeat.\n", rf.me)
 			}
 		case StateCandidate: // TODO: 候选者收到心跳？？？
 			rf.mu.Lock()
@@ -522,12 +522,13 @@ func (rf *Raft) handleElection() {
 				LastLogTerm:  rf.GetLastLogTerm()}
 			// 并行向其他服务器发送请求投票RPCs
 			rfLen := len(rf.peers)
-			wg := sync.WaitGroup{}
-			wg.Add(rfLen)
+
+			quorumCh := make(chan bool)
+
 			for i := 0; i < rfLen; i++ {
 				if i == rf.me { // 不需要向自己发送请求投票RPCs
 					atomic.AddInt32(&voteNum, 1) // 给自己投票
-					wg.Done()
+					//wg.Done()
 					continue
 				}
 				go func(server int) {
@@ -535,7 +536,7 @@ func (rf *Raft) handleElection() {
 					ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
 					// 如果候选者从发送选举投票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
 					if requestVoteReply.Term > rf.currentTerm {
-						DPrintf("[SWITCHSTATE: %v->StateCandidate]: raft[%v] receive raft[%v] Term(%v) > self Term(%v).\n", rf.state, rf.me, server, requestVoteReply.Term, rf.currentTerm)
+						DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] receive raft[%v] Term(%v) > self Term(%v).\n", rf.me, server, requestVoteReply.Term, rf.currentTerm)
 						rf.mu.Lock()
 						rf.currentTerm = requestVoteReply.Term
 						rf.state = StateFollower
@@ -544,32 +545,40 @@ func (rf *Raft) handleElection() {
 
 					if ok && requestVoteReply.VoteGranted {
 						atomic.AddInt32(&voteNum, 1)
-						// DPrintf("[GATHER VOTES]: [%v to %v term %v] voteNum == %v\n", server, rf.me, rf.currentTerm, voteNum)
+						if rf.gatherVotesChangeToLeader(voteNum) {
+							quorumCh <- true
+						}
 					}
-					wg.Done()
+					//wg.Done()
 				}(i)
 			}
 			// 最后确保所有goroutine投票得出统计票数
-			wg.Wait()
+			//wg.Wait()
+
 			if rf.state != StateCandidate {
 				break
 			}
-			rf.gatherVotesChangeToLeader(voteNum)
-
-			// 如果自己当选为leader或者进行下一轮候选人选举，votedFor都应该设置为none
-			rf.mu.Lock()
-			rf.votedFor = none
-			rf.mu.Unlock()
 
 			// 第三种可能的结果是候选人既没有赢得选举也没有输：如果有多个跟随者同时成为候选人，
 			// 那么选票可能会被瓜分以至于没有候选人可以赢得大多数人的支持。当这种情况发生的时候，
 			// 每一个候选人都会超时，然后通过增加当前任期号来开始一轮新的选举。然而，没有其他机制的话，
 			// 选票可能会被无限的重复瓜分。
+
 			// 为了阻止选票起初就被瓜分，选举超时时间是从一个固定的区间（例如 150-300毫秒）随机选择。
-			if rf.state == StateCandidate { // 只有当获取leader选票失败，再次选举才需要随机延时
-				time.Sleep(time.Duration(rf.randElectionTimeout) * time.Millisecond)
+			// 处理选举超时时间还未获取对应的quorum票数
+			select {
+			case <-quorumCh:
+				DPrintf("raft[%v] get quorum votes success.", rf.me)
+			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
+				// 超时进入下一轮选举
+				DPrintf("raft[%v] get quorum votes timeout, start next election.", rf.me)
 				rf.resetRandElectionTimeout()
 			}
+
+			// 如果自己当选为leader或者进行下一轮候选人选举，votedFor都应该设置为none
+			rf.mu.Lock()
+			rf.votedFor = none
+			rf.mu.Unlock()
 		case StateLeader:
 			rfLen := len(rf.peers)
 			for i := 0; i < rfLen; i++ {
@@ -587,7 +596,7 @@ func (rf *Raft) handleElection() {
 					rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
 					// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
 					if appendEntriesReply.Term > rf.currentTerm {
-						DPrintf("[SWITCHSTATE: %v->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.state, rf.me, server, appendEntriesReply.Term, rf.currentTerm)
+						DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
 						rf.mu.Lock()
 						rf.currentTerm = appendEntriesReply.Term
 						rf.state = StateFollower
