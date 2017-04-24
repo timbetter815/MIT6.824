@@ -19,11 +19,11 @@ package raft
 
 import "sync"
 import (
-	"fmt"
 	"labrpc"
 	"sync/atomic"
 	"time"
 	"math/rand"
+	"log"
 )
 
 // import "bytes"
@@ -46,13 +46,29 @@ type ApplyMsg struct {
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/327
 type LogEntry struct {
-	command interface{}
-	term    int
-	index   int
+	Command interface{}
+	Term    int
+	Index   int
 }
 
 // 用于定义Raft中，代表候选人id为空时的none值 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
 const none = -1
+
+// 心跳发送间隔时间，心跳接收超时时间，候选人选举之后随机延时基础时间 (单位毫秒）
+const (
+	HeartbeatBroadcastTick int = 100
+	// ElectionTick is the number of Node.Tick invocations that must pass between
+	// elections. That is, if a follower does not receive any message from the
+	// leader of current term before ElectionTick has elapsed, it will become
+	// candidate and start an election. ElectionTick must be greater than
+	// HeartbeatTick. We suggest ElectionTick = 10 * HeartbeatTick to avoid
+	// unnecessary leader switching.
+	ElectionTimeoutTick int = 2000
+	// HeartbeatTick is the number of Node.Tick invocations that must pass between
+	// heartbeats. That is, a leader sends heartbeat messages to maintain its
+	// leadership every HeartbeatTick ticks.
+	HeartbeatTimeOutTick int = 100
+)
 
 // 增加Raft的status Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
 type RaftState int
@@ -92,6 +108,14 @@ type Raft struct {
 	state RaftState // 此处用type RaftState int表示跟随者，候选者、领导人
 
 	heartbeatCh chan string // 此处用于接收其他raft的心跳信息
+
+	heartbeatBroadcastTime int // 领导者发送心跳的间隔时间
+	heartbeatTimeOut       int // 接收心跳超时时间
+	electionTimeout        int // 选举超时时间（base值）
+	// randElectionTimeout is a random number between
+	// [electiontimeout, 2 * electiontimeout - 1]. It gets reset
+	// when raft changes its state to follower or candidate.
+	randElectionTimeout int
 }
 
 // GetLastLogTerm 获取raft最后日志条目的任期
@@ -100,12 +124,12 @@ type Raft struct {
 func (rf *Raft) GetLastLogTerm() (term int) {
 	len := len(rf.logs)
 	if len == 0 {
-		// fmt.Printf("raft[%v] has no logs\n", rf.me)
+		// log.Printf("raft[%v] has no logs\n", rf.me)
 		// 如果当前没有日志条目，则任期号为none -1
 		term = none
 		return term
 	}
-	term = rf.logs[len-1].term
+	term = rf.logs[len-1].Term
 	return term
 }
 
@@ -115,12 +139,12 @@ func (rf *Raft) GetLastLogTerm() (term int) {
 func (rf *Raft) GetLastLogIndex() (index int) {
 	len := len(rf.logs)
 	if len == 0 {
-		// fmt.Printf("raft[%v] has no logs\n", rf.me)
+		// log.Printf("raft[%v] has no logs\n", rf.me)
 		// 如果当前没有日志条目，则索引为none -1
 		index = none
 		return index
 	}
-	index = rf.logs[len-1].index
+	index = rf.logs[len-1].Index
 	return index
 }
 
@@ -198,15 +222,24 @@ type RequestVoteReply struct {
 // example RequestVote RPC handler.
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	//fmt.Printf("## RequestVote start %+v , args == %+v replay == %+v\n", rf, args, reply)
+	//log.Printf("## RequestVote start %+v , args == %+v replay == %+v\n", rf, args, reply)
 	// Your code here (2A, 2B).
-	rf.resetCurrentTerm(args.Term)
+
+	// 接收选票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+	if args.Term > rf.currentTerm {
+		log.Printf("[SWITCH STATE]: raft[%v] receive RequestVote other raft Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, args.Term, rf.currentTerm)
+		rf.mu.Lock()
+		rf.currentTerm = args.Term
+		rf.state = StateFollower
+		rf.votedFor = none
+		rf.mu.Unlock()
+	}
 
 	reply.Term = rf.currentTerm
 	// Reply false if term < currentTerm (§5.1)
 	if args.Term < rf.currentTerm {
 		reply.VoteGranted = false
-		fmt.Printf("** fails RequestVote  [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
+		// log.Printf("** fails RequestVote  [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
 		return
 	}
 
@@ -215,15 +248,15 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
 	if (rf.votedFor == none || rf.votedFor == args.CandidateId) &&
 	//且当前请求投票的候选人的日志和rf的日志(至少)一样新，则投票
-		(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
+			(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
 		rf.mu.Lock()
 		rf.votedFor = args.CandidateId
 		rf.mu.Unlock()
 		reply.VoteGranted = true
-		fmt.Printf("|| success RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
+		log.Printf("[VOTEING]: success RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
 		return
 	} else {
-		fmt.Printf("** fails else RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
+		// log.Printf("** fails else RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
 		reply.VoteGranted = false
 		return
 	}
@@ -287,34 +320,27 @@ type AppendEntriesReply struct {
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/29
 func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) {
-	/*fmt.Printf("AppendEntries rf ====%v\n", rf)
-	fmt.Printf("args====%v\n", args.Entries)
-	fmt.Printf("reply====%v\n", reply)*/
-
-	fmt.Printf("args====%+v\n", args)
-	fmt.Printf("reply====%+v\n", reply)
+	//log.Printf("args====%+v\n", args)
 	// currentTerm, for leader to update itself
 	reply.Term = rf.currentTerm
 
 	// 1. Reply false if term < currentTerm (§5.1)
 	if args.Term < rf.currentTerm {
-		fmt.Printf("[rf=%+v] AppendEntries args.Term %v < rf.currentTerm %v\n", rf.me, args.Term, rf.currentTerm)
+		log.Printf("[rf=%+v] AppendEntries args.Term %v < rf.currentTerm %v\n", rf.me, args.Term, rf.currentTerm)
 		reply.Success = false
 		return
-	}
-
-	rf.resetCurrentTerm(args.Term)
-
-	rf.state = StateFollower
-	if rf.votedFor != none {
+	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term,则设置自己的Term，且切换为StateFollower
+		log.Printf("[SWITCH STATE]: raft[%v] receive AppendEntries other raft Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, args.Term, rf.currentTerm)
 		rf.mu.Lock()
+		rf.currentTerm = args.Term
+		rf.state = StateFollower
 		rf.votedFor = none
 		rf.mu.Unlock()
 	}
 
 	// 如果Entries为空，则表示心跳信息
 	if len(args.Entries) == 0 {
-		// fmt.Printf("send heartbeat to %v\n", rf.me)
+		// log.Printf("send heartbeat to %v\n", rf.me)
 		rf.heartbeatCh <- time.Now().String()
 		return // TODO：心跳信息则直接返回？
 	}
@@ -322,7 +348,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	// 2. Reply false if log doesn’t contain an entry at prevLogIndex
 	// whose term matches prevLogTerm (§5.3)
 	length := len(rf.logs)
-	if length > args.PrevLogIndex && rf.logs[args.PrevLogIndex].term != args.PrevLogTerm {
+	if length > args.PrevLogIndex && rf.logs[args.PrevLogIndex].Term != args.PrevLogTerm {
 		reply.Success = false
 		return
 	}
@@ -340,7 +366,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		// 从prevLogIndex的后面一个开始验证
 		for j := args.PrevLogIndex + 1; j < length; j++ {
 			// 如果有冲突，则删除冲突及之后的所有数据
-			if rf.logs[j].index == logEntries[i].index && rf.logs[j].term != logEntries[i].term {
+			if rf.logs[j].Index == logEntries[i].Index && rf.logs[j].Term != logEntries[i].Term {
 				rf.logs = rf.logs[0: j-1]
 				startIndex = i
 				goto appendFlag
@@ -357,7 +383,7 @@ appendFlag:
 	// 5. If leaderCommit > commitIndex, set commitIndex =
 	// min(leaderCommit, index of last new entry)
 	if args.LeaderCommit > rf.commitIndex {
-		index1 := logEntries[len(logEntries)-1].index
+		index1 := logEntries[len(logEntries)-1].Index
 		if index1 < args.LeaderCommit {
 			rf.commitIndex = index1
 		} else {
@@ -423,7 +449,7 @@ func (rf *Raft) gatherVotesChangeToLeader(voteNum int32) bool {
 			rf.mu.Lock()
 			rf.state = StateLeader
 			rf.mu.Unlock()
-			fmt.Printf("raft[%v] has gather majority votes[%v], term[%v], peers[%v] and switch to StateLeader.\n", rf.me, voteNum, rf.currentTerm, len(rf.peers))
+			log.Printf("[SWITCH STATE]: raft[%v] has gather majority votes[%v], term[%v], peers[%v] and switch to StateLeader.\n", rf.me, voteNum, rf.currentTerm, len(rf.peers))
 		} else {
 			success = false
 		}
@@ -431,7 +457,17 @@ func (rf *Raft) gatherVotesChangeToLeader(voteNum int32) bool {
 	return success
 }
 
-func (rf *Raft) resetCurrentTerm(term int) {
+func (rf *Raft) resetRandElectionTimeout() {
+	// 第三种可能的结果是候选人既没有赢得选举也没有输：如果有多个跟随者同时成为候选人，
+	// 那么选票可能会被瓜分以至于没有候选人可以赢得大多数人的支持。当这种情况发生的时候，
+	// 每一个候选人都会超时，然后通过增加当前任期号来开始一轮新的选举。然而，没有其他机制的话，
+	// 选票可能会被无限的重复瓜分。
+	// 为了阻止选票起初就被瓜分，选举超时时间是从一个固定的区间（例如 150-300毫秒）随机选择。
+	randTimeOut := rf.electionTimeout + rand.Int()%rf.electionTimeout
+	rf.randElectionTimeout = randTimeOut
+}
+
+/*func (rf *Raft) resetCurrentTerm(term int) {
 	// If RPC request or response contains term T > currentTerm:
 	// set currentTerm = T, convert to follower (§5.1)
 	if term > rf.currentTerm {
@@ -442,7 +478,7 @@ func (rf *Raft) resetCurrentTerm(term int) {
 			rf.mu.Unlock()
 		}
 	}
-}
+}*/
 
 // 处理状态变化及选举 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/29
 func (rf *Raft) handleElection() {
@@ -450,18 +486,20 @@ func (rf *Raft) handleElection() {
 		switch rf.state {
 		case StateFollower:
 			select {
-			case <-rf.heartbeatCh:
-			// rf.votedFor = none // TODO:正常在StateFollower状态，votedFor== none？？？
+			case heartbeat := <-rf.heartbeatCh:
+				// rf.votedFor = none // TODO:正常在StateFollower状态，votedFor== none？？？
 
-			// fmt.Printf("raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
+				log.Printf("[HEARTBEAT]: raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
+
 			// 如果超过500毫秒未收到心跳信息，则切换状态为候选人
-			case <-time.After(500 * time.Millisecond):
+			case <-time.After(time.Duration(rf.randElectionTimeout)):
 				rf.mu.Lock()
 				rf.state = StateCandidate
 				rf.mu.Unlock()
-				fmt.Printf("raft[%v] does not receive heartbeat, and switch to StateCandidate.\n", rf.me)
+				log.Printf("[SWITCH STATE]: raft[%v] does not receive heartbeat, and switch to StateCandidate.\n", rf.me)
 			}
 		case StateCandidate: // TODO: 候选者收到心跳？？？
+			time.Sleep(time.Duration(rf.randElectionTimeout))
 			rf.mu.Lock()
 			rf.votedFor = rf.me
 			// 任期加1
@@ -488,25 +526,27 @@ func (rf *Raft) handleElection() {
 				go func(server int) {
 					requestVoteReply := &RequestVoteReply{}
 					ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
-					rf.resetCurrentTerm(requestVoteReply.Term)
+					// 如果候选者从发送选举投票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+					if requestVoteReply.Term > rf.currentTerm {
+						log.Printf("[SWITCH STATE]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateCandidate.\n", rf.me, server, requestVoteReply.Term, rf.currentTerm)
+						rf.mu.Lock()
+						rf.currentTerm = requestVoteReply.Term
+						rf.state = StateFollower
+						rf.mu.Unlock()
+					}
+
 					if ok && requestVoteReply.VoteGranted {
 						atomic.AddInt32(&voteNum, 1)
-						fmt.Printf("Gather Votes: [%v to %v term %v] voteNum == %v\n", server, rf.me, rf.currentTerm, voteNum)
+						// log.Printf("[GATHER VOTES]: [%v to %v term %v] voteNum == %v\n", server, rf.me, rf.currentTerm, voteNum)
 					}
 					wg.Done()
 				}(i)
-
-				/*// 当获得超过半数选票时，立马切换为leader,由于goroutine执行很快，此处一般不会进入？
-				if rf.gatherVotesChangeToLeader(voteNum) {
-					// 如果获取超过半数选票，切换为leader，且不需要等待其他投票结果
-					*//*restDone := rfLen - i
-					wg.Add(-restDone)*//*
-					fmt.Printf("???1------------\n")
-					break
-				}*/
 			}
 			// 最后确保所有goroutine投票得出统计票数
 			wg.Wait()
+			if rf.state != StateCandidate {
+				break
+			}
 			rf.gatherVotesChangeToLeader(voteNum)
 
 			// 如果自己当选为leader或者进行下一轮候选人选举，votedFor都应该设置为none
@@ -519,10 +559,8 @@ func (rf *Raft) handleElection() {
 			// 每一个候选人都会超时，然后通过增加当前任期号来开始一轮新的选举。然而，没有其他机制的话，
 			// 选票可能会被无限的重复瓜分。
 			// 为了阻止选票起初就被瓜分，选举超时时间是从一个固定的区间（例如 150-300毫秒）随机选择。
-
 			if rf.state == StateCandidate { // 只有当获取leader选票失败，再次选举才需要随机延时
-				randTime := rand.Int()%150 + 150
-				time.Sleep(time.Duration(randTime) * time.Millisecond)
+				rf.resetRandElectionTimeout()
 			}
 		case StateLeader:
 			rfLen := len(rf.peers)
@@ -537,13 +575,19 @@ func (rf *Raft) handleElection() {
 					Entries:  nil}
 
 				go func(server int) {
-					appendEntriesReply := &AppendEntriesReply{888, true}
-					fmt.Printf("send heartbeat %+v to %v\n", rf, server)
+					appendEntriesReply := &AppendEntriesReply{}
 					rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
-					rf.resetCurrentTerm(appendEntriesReply.Term)
+					// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+					if appendEntriesReply.Term > rf.currentTerm {
+						log.Printf("[SWITCH STATE]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
+						rf.mu.Lock()
+						rf.currentTerm = appendEntriesReply.Term
+						rf.state = StateFollower
+						rf.mu.Unlock()
+					}
 				}(i)
 			}
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(time.Duration(rf.heartbeatBroadcastTime) * time.Millisecond)
 		}
 	}
 }
@@ -560,7 +604,7 @@ func (rf *Raft) handleElection() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-	persister *Persister, applyCh chan ApplyMsg) *Raft {
+		persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
@@ -569,6 +613,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// Your initialization code here (2A, 2B, 2C).
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
 	rf.heartbeatCh = make(chan string)
+	rf.heartbeatBroadcastTime = HeartbeatBroadcastTick
+	rf.heartbeatTimeOut = HeartbeatTimeOutTick
+	rf.electionTimeout = ElectionTimeoutTick
+	rf.resetRandElectionTimeout()
+
 	rf.state = StateFollower // 初始状态为跟随者
 	rf.currentTerm = 0
 	rf.votedFor = none
