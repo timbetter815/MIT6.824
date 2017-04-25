@@ -101,9 +101,9 @@ type Raft struct {
 	// state a Raft server must maintain.
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
 	// Persistent state on all servers:(Updated on stable storage before responding to RPCs)
-	currentTerm int         // 任期（第一次启动初始化为0，后续单调递增）
-	votedFor    int         // 当前任期接收选票的候选人id(如果没有则设置为none，用常量-1代替)
-	logs        []*LogEntry //log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
+	currentTerm int        // 任期（第一次启动初始化为0，后续单调递增）
+	votedFor    int        // 当前任期接收选票的候选人id(如果没有则设置为none，用常量-1代替)
+	logs        []LogEntry //log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
 
 	// Volatile state on all servers:
 	commitIndex int // index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -121,6 +121,8 @@ type Raft struct {
 
 	electionTimeout     int // 选举超时时间（base值）,更多请查看：常量ElectionTimeoutTick
 	randElectionTimeout int
+
+	applyCh chan ApplyMsg
 }
 
 // GetLastLogTerm 获取raft最后日志条目的任期
@@ -130,8 +132,8 @@ func (rf *Raft) GetLastLogTerm() (term int) {
 	len := len(rf.logs)
 	if len == 0 {
 		// DPrintf("raft[%v] has no logs\n", rf.me)
-		// 如果当前没有日志条目，则任期号为none -1
-		term = none
+		// 如果当前没有日志条目，则任期号为0
+		term = 0
 		return term
 	}
 	term = rf.logs[len-1].Term
@@ -145,8 +147,8 @@ func (rf *Raft) GetLastLogIndex() (index int) {
 	len := len(rf.logs)
 	if len == 0 {
 		// DPrintf("raft[%v] has no logs\n", rf.me)
-		// 如果当前没有日志条目，则索引为none -1
-		index = none
+		// 如果当前没有日志条目，则索引为0
+		index = 0
 		return index
 	}
 	index = rf.logs[len-1].Index
@@ -253,7 +255,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
 	if (rf.votedFor == none || rf.votedFor == args.CandidateId) &&
 	//且当前请求投票的候选人的日志和rf的日志(至少)一样新，则投票
-			(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
+		(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
 		rf.mu.Lock()
 		rf.votedFor = args.CandidateId
 		rf.mu.Unlock()
@@ -305,12 +307,12 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/28
 type AppendEntriesArgs struct {
-	Term         int         // 领导人的任期
-	LeaderId     int         // 领导人id，so follower can redirect clients
-	PrevLogIndex int         // index of log entry immediately preceding new ones
-	PrevLogTerm  int         // term of prevLogIndex entry
-	Entries      []*LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
-	LeaderCommit int         // leader’s commitIndex
+	Term         int        // 领导人的任期
+	LeaderId     int        // 领导人id，so follower can redirect clients
+	PrevLogIndex int        // index of log entry immediately preceding new ones
+	PrevLogTerm  int        // term of prevLogIndex entry
+	Logs         []LogEntry // log entries to store (empty for heartbeat; may send more than one for efficiency)
+	LeaderCommit int        // leader’s commitIndex
 }
 
 // AppendEntriesReply AppendEntries函数的RPC回复参数
@@ -334,17 +336,15 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		DPrintf("[rf=%+v] AppendEntries args.Term %v < rf.currentTerm %v\n", rf.me, args.Term, rf.currentTerm)
 		reply.Success = false
 		return
-	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term,则设置自己的Term，且切换为StateFollower
-		DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive AppendEntries other raft Term(%v) > self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
-		rf.mu.Lock()
-		rf.currentTerm = args.Term
-		rf.state = StateFollower
-		rf.votedFor = none
-		rf.mu.Unlock()
+	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term,且自己不为StateFollower时，则设置自己的Term，且切换为StateFollower
+		if rf.state != StateFollower {
+			DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive AppendEntries other raft Term(%v) >= self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
+			rf.becomeFollower(args.Term)
+		}
 	}
 
 	// 如果Entries为空，则表示心跳信息
-	if len(args.Entries) == 0 {
+	if len(args.Logs) == 0 {
 		// DPrintf("send heartbeat to %v\n", rf.me)
 		rf.heartbeatCh <- time.Now().String()
 		return // TODO：心跳信息则直接返回？
@@ -364,7 +364,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	// 在论文图8中有解释该不一致情况出现场景
 	// 此处一定能保证此处entries肯定不为空，为空则在心跳逻辑，return了，
 	// 且contained entry matching prevLogIndex and prevLogTerm
-	logEntries := args.Entries
+	logEntries := args.Logs
 	startIndex := 0
 
 	for i := 0; i < len(logEntries); i++ {
@@ -413,6 +413,17 @@ func (rf *Raft) sendAppendEntries(server int, args AppendEntriesArgs, reply *App
 	return ok
 }
 
+func (rf *Raft) appendLog(command interface{}) {
+	logEntry := LogEntry{
+		Command: command,
+		Index:   rf.GetLastLogIndex() + 1,
+		Term:    rf.currentTerm,
+	}
+	rf.mu.Lock()
+	rf.logs = append(rf.logs, logEntry)
+	rf.mu.Unlock()
+}
+
 //
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
@@ -434,8 +445,30 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	// Your code here (2B).
 	if rf.state != StateLeader {
 		isLeader = false
+		return index, term, isLeader
 	}
+	term = rf.currentTerm
 
+	rf.appendLog(command)
+
+	quorumLogCh := make(chan bool)
+	lastlogIndex := rf.GetLastLogIndex()
+	rf.broadcastAppendEntries(rf.logs[lastlogIndex-1:], quorumLogCh)
+
+	// 等待大多数日志被复制成功
+	<-quorumLogCh
+	DPrintf("[APPENDLOG SUCCESS]: raft[%v] have a quorum append log success with term[%v], peers[%v].\n", rf.me, term, len(rf.peers))
+
+	applyMsg := ApplyMsg{
+		Index:   lastlogIndex,
+		Command: command}
+	applyMsg.Index = rf.commitIndex
+
+	go func(applyMsg ApplyMsg) {
+		rf.applyCh <- applyMsg
+	}(applyMsg)
+
+	index = lastlogIndex
 	return index, term, isLeader
 }
 
@@ -454,9 +487,7 @@ func (rf *Raft) gatherVotesChangeToLeader(voteNum int32) bool {
 	success := true
 	if rf.state != StateLeader {
 		if int(voteNum) > len(rf.peers)/2 {
-			rf.mu.Lock()
-			rf.state = StateLeader
-			rf.mu.Unlock()
+			rf.becomeLeader()
 			DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes[%v], term[%v], peers[%v].\n", rf.me, voteNum, rf.currentTerm, len(rf.peers))
 		} else {
 			success = false
@@ -488,33 +519,117 @@ func (rf *Raft) resetRandElectionTimeout() {
 	}
 }*/
 
+func (rf*Raft) becomeFollower(term int) {
+	rf.mu.Lock()
+	rf.currentTerm = term
+	rf.state = StateFollower
+	// rf.votedFor = none
+	rf.mu.Unlock()
+}
+
+func (rf*Raft) becomeCandidate() {
+	rf.mu.Lock()
+	rf.state = StateCandidate
+	rf.votedFor = rf.me
+	// 任期加1
+	rf.currentTerm++
+	rf.resetRandElectionTimeout()
+	rf.mu.Unlock()
+}
+
+func (rf*Raft) becomeLeader() {
+	rf.mu.Lock()
+	rf.state = StateLeader
+	rf.votedFor = none
+	rf.mu.Unlock()
+}
+
+func (rf *Raft) broadcastHeartbeat() {
+	rfLen := len(rf.peers)
+	for i := 0; i < rfLen; i++ {
+		if i == rf.me { // 不需要向自己发送心跳消息
+			continue
+		}
+
+		appendEntriesArgs := AppendEntriesArgs{
+			Term:     rf.currentTerm,
+			LeaderId: rf.me,
+			Logs:     nil}
+
+		go func(server int) {
+			appendEntriesReply := &AppendEntriesReply{}
+			rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
+			// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+			if appendEntriesReply.Term > rf.currentTerm {
+				rf.becomeFollower(appendEntriesReply.Term)
+				DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
+			}
+		}(i)
+	}
+}
+
+func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool) {
+	rfLen := len(rf.peers)
+	var successNum int32 = 0
+	for i := 0; i < rfLen; i++ {
+		if i == rf.me { // 不需要向自己发送心跳消息
+			continue
+		}
+
+		appendEntriesArgs := AppendEntriesArgs{
+			Term:     rf.currentTerm,
+			LeaderId: rf.me,
+			Logs:     logEntrys}
+
+		go func(server int) {
+			appendEntriesReply := &AppendEntriesReply{}
+		SENDAGAIN:
+			ok := rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
+			// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+			if appendEntriesReply.Term > rf.currentTerm {
+				rf.becomeFollower(appendEntriesReply.Term)
+				DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
+			}
+
+			if ok && appendEntriesReply.Success {
+				atomic.AddInt32(&successNum, 1)
+				if int(successNum) > len(rf.peers) {
+					// 此处使用select的default来实现，判断chan是否已经塞满数据了
+					// 如果之前goroutine已经投票超过半数，则quorumCh<-true被执行过一次（则被塞满了数据，如果不使用default后续将一直阻塞）
+					// 使用default后，那么在后续执行quorumCh <- true时候，则会被阻塞，从来走default逻辑，达到不阻塞
+					select {
+					case quorumCh <- true:
+					default:
+						// 此处代表之间已经获取投票成功了，后续goroutine不能阻塞在quorumCh <- true，应该直接放过
+						return
+					}
+
+				}
+			} else {
+				// 如果失败，则重试，直到成功
+				goto SENDAGAIN
+			}
+		}(i)
+	}
+
+}
+
 // 处理状态变化及选举 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/29
 func (rf *Raft) handleElection() {
 	for {
 		switch rf.state {
 		case StateFollower:
-			rf.resetRandElectionTimeout()
 			select {
 			case heartbeat := <-rf.heartbeatCh:
-				// rf.votedFor = none // TODO:正常在StateFollower状态，votedFor== none？？？
-				DPrintf("[HEARTBEAT]: raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
+				DPrintf("[HEARTBEAT]: raft[%v](state = %v) receive heartbeat %v.\n", rf.me, rf.state, heartbeat)
 
 			// 如果超过随机超时时间（随机）未收到心跳信息，则切换状态为候选人
 			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
-				rf.mu.Lock()
-				rf.state = StateCandidate
-				rf.mu.Unlock()
-				DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] does not receive heartbeat.\n", rf.me)
+				rf.becomeCandidate()
+				DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] does not receive heartbeat %v.\n", rf.me, time.Now())
 			}
-		case StateCandidate: // TODO: 候选者收到心跳？？？
-			rf.mu.Lock()
-			rf.votedFor = rf.me
-			// 任期加1
-			rf.currentTerm++
-			rf.mu.Unlock()
-
+		case StateCandidate:
 			var voteNum int32 = 0
-
 			requestVoteArgs := &RequestVoteArgs{
 				Term:         rf.currentTerm,
 				CandidateId:  rf.me,
@@ -522,7 +637,6 @@ func (rf *Raft) handleElection() {
 				LastLogTerm:  rf.GetLastLogTerm()}
 			// 并行向其他服务器发送请求投票RPCs
 			rfLen := len(rf.peers)
-
 			quorumCh := make(chan bool)
 
 			for i := 0; i < rfLen; i++ {
@@ -536,10 +650,7 @@ func (rf *Raft) handleElection() {
 					// 如果候选者从发送选举投票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
 					if requestVoteReply.Term > rf.currentTerm {
 						DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] receive raft[%v] Term(%v) > self Term(%v).\n", rf.me, server, requestVoteReply.Term, rf.currentTerm)
-						rf.mu.Lock()
-						rf.currentTerm = requestVoteReply.Term
-						rf.state = StateFollower
-						rf.mu.Unlock()
+						rf.becomeFollower(requestVoteReply.Term)
 					}
 
 					if ok && requestVoteReply.VoteGranted {
@@ -559,10 +670,6 @@ func (rf *Raft) handleElection() {
 					}
 				}(i)
 			}
-			// 如果此时不为StateCandidate，则不需要进入下一轮选举操作
-			if rf.state != StateCandidate {
-				break
-			}
 
 			// 第三种可能的结果是候选人既没有赢得选举也没有输：如果有多个跟随者同时成为候选人，
 			// 那么选票可能会被瓜分以至于没有候选人可以赢得大多数人的支持。当这种情况发生的时候，
@@ -574,41 +681,16 @@ func (rf *Raft) handleElection() {
 			select {
 			case <-quorumCh:
 				DPrintf("raft[%v] get quorum votes success.", rf.me)
+			case heartbeat := <-rf.heartbeatCh:
+				DPrintf("[HEARTBEAT]: raft[%v](state = %v) receive heartbeat %v.\n", rf.me, rf.state, heartbeat)
+				rf.becomeFollower(rf.currentTerm)
 			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
 				// 超时进入下一轮选举
 				DPrintf("raft[%v] get quorum votes timeout, start next election.", rf.me)
-				rf.resetRandElectionTimeout()
+				rf.becomeCandidate()
 			}
-
-			// 如果自己当选为leader或者进行下一轮候选人选举，votedFor都应该设置为none
-			rf.mu.Lock()
-			rf.votedFor = none
-			rf.mu.Unlock()
 		case StateLeader:
-			rfLen := len(rf.peers)
-			for i := 0; i < rfLen; i++ {
-				if i == rf.me { // 不需要向自己发送心跳消息
-					continue
-				}
-
-				appendEntriesArgs := AppendEntriesArgs{
-					Term:     rf.currentTerm,
-					LeaderId: rf.me,
-					Entries:  nil}
-
-				go func(server int) {
-					appendEntriesReply := &AppendEntriesReply{}
-					rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
-					// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
-					if appendEntriesReply.Term > rf.currentTerm {
-						DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
-						rf.mu.Lock()
-						rf.currentTerm = appendEntriesReply.Term
-						rf.state = StateFollower
-						rf.mu.Unlock()
-					}
-				}(i)
-			}
+			rf.broadcastHeartbeat()
 			time.Sleep(time.Duration(rf.heartbeatBroadcastTime) * time.Millisecond)
 		}
 	}
@@ -626,7 +708,7 @@ func (rf *Raft) handleElection() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-		persister *Persister, applyCh chan ApplyMsg) *Raft {
+	persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
@@ -634,6 +716,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// Your initialization code here (2A, 2B, 2C).
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
+	rf.applyCh = applyCh
 	rf.heartbeatCh = make(chan string)
 	rf.heartbeatBroadcastTime = HeartbeatBroadcastTick
 	//rf.heartbeatTimeOut = HeartbeatTimeOutTick
@@ -643,12 +726,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.state = StateFollower // 初始状态为跟随者
 	rf.currentTerm = 0
 	rf.votedFor = none
-	rf.logs = make([]*LogEntry, 0)
+	rf.logs = make([]LogEntry, 0)
 
 	rf.commitIndex = 0
 	rf.lastApplied = 0
 
-	// 使用goroutine，处理状态变化及选举
+	// 使用goroutine，处理状态变化及选举,发送心跳
 	go rf.handleElection()
 
 	// initialize from state persisted before a crash
