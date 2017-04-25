@@ -117,12 +117,9 @@ type Raft struct {
 
 	heartbeatCh chan string // 此处用于接收其他raft的心跳信息
 
-	heartbeatBroadcastTime int // 领导者发送心跳的间隔时间
-	// heartbeatTimeOut       int // 接收心跳超时时间
-	electionTimeout int // 选举超时时间（base值）
-	// randElectionTimeout is a random number between
-	// [electiontimeout, 2 * electiontimeout - 1]. It gets reset
-	// when raft changes its state to follower or candidate.
+	heartbeatBroadcastTime int // 领导者发送心跳的间隔时间,更多请查看：常量HeartbeatBroadcastTick
+
+	electionTimeout     int // 选举超时时间（base值）,更多请查看：常量ElectionTimeoutTick
 	randElectionTimeout int
 }
 
@@ -435,6 +432,9 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	isLeader := true
 
 	// Your code here (2B).
+	if rf.state != StateLeader {
+		isLeader = false
+	}
 
 	return index, term, isLeader
 }
@@ -499,7 +499,7 @@ func (rf *Raft) handleElection() {
 				// rf.votedFor = none // TODO:正常在StateFollower状态，votedFor== none？？？
 				DPrintf("[HEARTBEAT]: raft[%v] receive heartbeat %v.\n", rf.me, heartbeat)
 
-			// 如果超过500毫秒未收到心跳信息，则切换状态为候选人
+			// 如果超过随机超时时间（随机）未收到心跳信息，则切换状态为候选人
 			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
 				rf.mu.Lock()
 				rf.state = StateCandidate
