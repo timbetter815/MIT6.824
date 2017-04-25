@@ -337,7 +337,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		reply.Success = false
 		return
 	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term,且自己不为StateFollower时，则设置自己的Term，且切换为StateFollower
-		if rf.state != StateFollower {
+		if rf.state != StateFollower || args.Term > rf.currentTerm {
 			DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive AppendEntries other raft Term(%v) >= self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
 			rf.becomeFollower(args.Term)
 		}
