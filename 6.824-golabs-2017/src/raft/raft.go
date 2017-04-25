@@ -256,7 +256,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
 	if (rf.votedFor == none || rf.votedFor == args.CandidateId) &&
 	//且当前请求投票的候选人的日志和rf的日志(至少)一样新，则投票
-		(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
+			(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
 		rf.mu.Lock()
 		rf.votedFor = args.CandidateId
 		rf.mu.Unlock()
@@ -528,7 +528,6 @@ func (rf *Raft) handleElection() {
 			for i := 0; i < rfLen; i++ {
 				if i == rf.me { // 不需要向自己发送请求投票RPCs
 					atomic.AddInt32(&voteNum, 1) // 给自己投票
-					//wg.Done()
 					continue
 				}
 				go func(server int) {
@@ -546,15 +545,21 @@ func (rf *Raft) handleElection() {
 					if ok && requestVoteReply.VoteGranted {
 						atomic.AddInt32(&voteNum, 1)
 						if rf.gatherVotesChangeToLeader(voteNum) {
-							quorumCh <- true
+							// 此处使用select的default来实现，判断chan是否已经塞满数据了
+							// 如果之前goroutine已经投票超过半数，则quorumCh<-true被执行过一次（则被塞满了数据，如果不使用default后续将一直阻塞）
+							// 使用default后，那么在后续执行quorumCh <- true时候，则会被阻塞，从来走default逻辑，达到不阻塞
+							select {
+							case quorumCh <- true:
+							default:
+								// 此处代表之间已经获取投票成功了，后续goroutine不能阻塞在quorumCh <- true，应该直接放过
+								return
+							}
+
 						}
 					}
-					//wg.Done()
 				}(i)
 			}
-			// 最后确保所有goroutine投票得出统计票数
-			//wg.Wait()
-
+			// 如果此时不为StateCandidate，则不需要进入下一轮选举操作
 			if rf.state != StateCandidate {
 				break
 			}
@@ -621,7 +626,7 @@ func (rf *Raft) handleElection() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-	persister *Persister, applyCh chan ApplyMsg) *Raft {
+		persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister

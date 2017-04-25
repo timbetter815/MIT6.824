@@ -70,3 +70,20 @@ func TestTime3(t *testing.T) {
 
 	fmt.Printf("end time == %v\n", time.Now()) // 立即输出
 }
+
+func TestTime4(t *testing.T) {
+	timeout := 8
+	fmt.Printf("Start: %v\n", time.Now())
+	timer := time.NewTimer(time.Duration(timeout) * time.Second)
+	go func() {
+		for {
+			fmt.Printf("%v\n", time.Now())
+			time.Sleep(1 * time.Second)
+		}
+	}()
+	select {
+	case <-timer.C:
+		fmt.Printf("timeout: %v\n", time.Now())
+	}
+	fmt.Printf("Finished: %v\n", time.Now())
+}
