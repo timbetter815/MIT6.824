@@ -87,3 +87,15 @@ func TestTime4(t *testing.T) {
 	}
 	fmt.Printf("Finished: %v\n", time.Now())
 }
+
+func TestTime5(t *testing.T) {
+	timeStr := time.Now().String()
+	fmt.Printf("%v\n", timeStr)
+	time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", timeStr)
+	if err == nil {
+		fmt.Printf("time == %v\n", time)
+	} else{
+		fmt.Printf("%v\n",err)
+	}
+
+}

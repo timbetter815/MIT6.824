@@ -255,7 +255,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
 	if (rf.votedFor == none || rf.votedFor == args.CandidateId) &&
 	//且当前请求投票的候选人的日志和rf的日志(至少)一样新，则投票
-		(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
+			(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
 		rf.mu.Lock()
 		rf.votedFor = args.CandidateId
 		rf.mu.Unlock()
@@ -327,8 +327,9 @@ type AppendEntriesReply struct {
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/29
 func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply) {
-	//DPrintf("args====%+v\n", args)
 	// currentTerm, for leader to update itself
+	// DPrintf("rf[%v] receive AppendEntries Logs == %v. args.Term(%v) rf.currentTerm(%v)\n", rf.me, args.Logs, args.Term, rf.currentTerm)
+
 	reply.Term = rf.currentTerm
 
 	// 1. Reply false if term < currentTerm (§5.1)
@@ -438,6 +439,7 @@ func (rf *Raft) appendLog(command interface{}) {
 // the leader.
 // 询问Raft启动一个进程将命令添加到副本log中
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
+	DPrintf("[Start AGREEMENT]: raft[%v](%v) command == %v.\n", rf.me, rf.state, command)
 	index := -1
 	term := -1
 	isLeader := true
@@ -452,15 +454,15 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.appendLog(command)
 
 	quorumLogCh := make(chan bool)
-	lastlogIndex := rf.GetLastLogIndex()
-	rf.broadcastAppendEntries(rf.logs[lastlogIndex-1:], quorumLogCh)
+	lastLogIndex := rf.GetLastLogIndex()
+	rf.broadcastAppendEntries(rf.logs[lastLogIndex-1:], quorumLogCh)
 
 	// 等待大多数日志被复制成功
 	<-quorumLogCh
 	DPrintf("[APPENDLOG SUCCESS]: raft[%v] have a quorum append log success with term[%v], peers[%v].\n", rf.me, term, len(rf.peers))
 
 	applyMsg := ApplyMsg{
-		Index:   lastlogIndex,
+		Index:   lastLogIndex,
 		Command: command}
 	applyMsg.Index = rf.commitIndex
 
@@ -468,7 +470,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		rf.applyCh <- applyMsg
 	}(applyMsg)
 
-	index = lastlogIndex
+	index = lastLogIndex
 	return index, term, isLeader
 }
 
@@ -505,19 +507,6 @@ func (rf *Raft) resetRandElectionTimeout() {
 	randTimeOut := rf.electionTimeout + rand.Int()%rf.electionTimeout
 	rf.randElectionTimeout = randTimeOut
 }
-
-/*func (rf *Raft) resetCurrentTerm(term int) {
-	// If RPC request or response contains term T > currentTerm:
-	// set currentTerm = T, convert to follower (§5.1)
-	if term > rf.currentTerm {
-		rf.currentTerm = term
-		if rf.state != StateFollower {
-			rf.mu.Lock()
-			rf.state = StateFollower
-			rf.mu.Unlock()
-		}
-	}
-}*/
 
 func (rf*Raft) becomeFollower(term int) {
 	rf.mu.Lock()
@@ -569,6 +558,10 @@ func (rf *Raft) broadcastHeartbeat() {
 }
 
 func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool) {
+	if len(logEntrys) == 0 {
+		DPrintf("[ERROR]: broadcastAppendEntries log is null.")
+	}
+	DPrintf("[BROADCAST APPENDLOGS]: raft[%v](%v) Term(%v) broadcast AppendEntries Logs to other raft. Logs == %v.\n", rf.me, rf.state, rf.currentTerm, logEntrys)
 	rfLen := len(rf.peers)
 	var successNum int32 = 0
 	for i := 0; i < rfLen; i++ {
@@ -592,6 +585,7 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool)
 			}
 
 			if ok && appendEntriesReply.Success {
+				DPrintf("[APPENDLOG SUCCESS]: rf[%v] send log to rf[%v] success.\n", rf.me, server)
 				atomic.AddInt32(&successNum, 1)
 				if int(successNum) > len(rf.peers) {
 					// 此处使用select的default来实现，判断chan是否已经塞满数据了
@@ -614,6 +608,16 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool)
 
 }
 
+var markTime = time.Now()
+
+func (rf *Raft) printHeartBeatIntervalSeconds(seconds int, heartbeat string) {
+	timeHeart, _ := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", heartbeat)
+	if markTime.Sub(timeHeart) > time.Duration(seconds)*time.Second {
+		DPrintf("[HEARTBEAT]: raft[%v](%v) receive heartbeat %v.\n", rf.me, rf.state, heartbeat)
+		markTime = time.Now()
+	}
+}
+
 // 处理状态变化及选举 Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/29
 func (rf *Raft) handleElection() {
 	for {
@@ -621,7 +625,7 @@ func (rf *Raft) handleElection() {
 		case StateFollower:
 			select {
 			case heartbeat := <-rf.heartbeatCh:
-				DPrintf("[HEARTBEAT]: raft[%v](state = %v) receive heartbeat %v.\n", rf.me, rf.state, heartbeat)
+				rf.printHeartBeatIntervalSeconds(1, heartbeat)
 
 			// 如果超过随机超时时间（随机）未收到心跳信息，则切换状态为候选人
 			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
@@ -682,7 +686,7 @@ func (rf *Raft) handleElection() {
 			case <-quorumCh:
 				DPrintf("raft[%v] get quorum votes success.", rf.me)
 			case heartbeat := <-rf.heartbeatCh:
-				DPrintf("[HEARTBEAT]: raft[%v](state = %v) receive heartbeat %v.\n", rf.me, rf.state, heartbeat)
+				rf.printHeartBeatIntervalSeconds(1, heartbeat)
 				rf.becomeFollower(rf.currentTerm)
 			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
 				// 超时进入下一轮选举
@@ -708,7 +712,7 @@ func (rf *Raft) handleElection() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-	persister *Persister, applyCh chan ApplyMsg) *Raft {
+		persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
