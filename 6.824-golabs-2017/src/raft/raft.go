@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 	"time"
 	"math/rand"
-	"fmt"
 )
 
 // import "bytes"
@@ -391,22 +390,30 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		} else {
 			rf.commitIndex = args.LeaderCommit
 		}
+		go rf.applyLog()
 	}
-	rf.applyLog()
-	fmt.Printf("------------rf[%+v]\n", rf)
 }
 
 // 如果commitIndex > lastApplied，那么就 lastApplied 加一，
 // 并把log[lastApplied]应用到状态机中（5.3 节）
 func (rf *Raft) applyLog() {
-	if rf.commitIndex > rf.lastApplied {
+	for rf.commitIndex >= rf.lastApplied {
+		log := rf.logs[rf.lastApplied]
+		// TODO: log应用到状态机中
+		applyMsg := ApplyMsg{
+			Index:   log.Index,
+			Command: log.Command}
+
+		rf.applyCh <- applyMsg
+		rf.mu.Lock()
 		rf.lastApplied++
-		// TODO:
+		rf.mu.Unlock()
 	}
 }
 
 // AppendEntries send a RequestVote RPC to a server.添加日志条目，
 // Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).
+// ok == false 代表超时无反馈
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/28
 func (rf *Raft) sendAppendEntries(server int, args AppendEntriesArgs, reply *AppendEntriesReply) bool {
@@ -414,12 +421,7 @@ func (rf *Raft) sendAppendEntries(server int, args AppendEntriesArgs, reply *App
 	return ok
 }
 
-func (rf *Raft) appendLog(command interface{}) {
-	logEntry := LogEntry{
-		Command: command,
-		Index:   rf.GetLastLogIndex() + 1,
-		Term:    rf.currentTerm,
-	}
+func (rf *Raft) appendLog(logEntry LogEntry) {
 	rf.mu.Lock()
 	rf.logs = append(rf.logs, logEntry)
 	rf.mu.Unlock()
@@ -450,24 +452,27 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	}
 	DPrintf("[Start AGREEMENT]: raft[%v](%v) command == %v.\n", rf.me, rf.state, command)
 
-	rf.appendLog(command)
+	go func(interface{}) {
+		logEntry := LogEntry{
+			Command: command,
+			Index:   rf.GetLastLogIndex() + 1,
+			Term:    rf.currentTerm,
+		}
 
-	lastLogIndex := rf.GetLastLogIndex()
-	if rf.broadcastAppendEntries(rf.logs[lastLogIndex:]) {
-		DPrintf("[BROADCASTAPPENDLOG SUCCESS]: raft[%v] have a quorum append log success with term[%v], peers[%v].\n\n\n\n", rf.me, rf.currentTerm, len(rf.peers))
+		rf.appendLog(logEntry)
 
-		applyMsg := ApplyMsg{
-			Index:   rf.commitIndex,
-			Command: command}
+		//lastLogIndex := rf.GetLastLogIndex()
+		// 		if rf.broadcastAppendEntries(rf.logs[lastLogIndex:]) {
+		entries := []LogEntry{logEntry}
+		if rf.broadcastAppendEntries(entries) {
+			DPrintf("[BROADCASTAPPENDLOG SUCCESS]: raft[%v] have a quorum append log[%+v] success with term[%v], peers[%v].\n\n", rf.me, entries, rf.currentTerm, len(rf.peers))
+			rf.nextIndex[rf.me] += len(entries)
+			go rf.applyLog()
+		}
+	}(command)
 
-		go func(applyMsg ApplyMsg) {
-			rf.applyCh <- applyMsg
-		}(applyMsg)
-	}
-
-	index = rf.commitIndex
+	index = rf.GetLastLogIndex() + 1
 	term = rf.currentTerm
-	fmt.Printf("-------------index==%v\n", index)
 	return index, term, isLeader
 }
 
@@ -513,11 +518,11 @@ func (rf*Raft) becomeLeader() {
 	rf.mu.Lock()
 	rf.state = StateLeader
 	rf.votedFor = none
-	rf.initNextAndMatchIndex()
+	rf.initNextIndex()
 	rf.mu.Unlock()
 }
 
-func (rf*Raft) initNextAndMatchIndex() {
+func (rf*Raft) initNextIndex() {
 	length := len(rf.peers)
 	for index := 0; index < length; index++ {
 		if index != rf.me {
@@ -552,21 +557,37 @@ func (rf *Raft) broadcastHeartbeat() {
 	}
 }
 
+func (rf*Raft) updateNextAndMatchIndex(server int, logEntryLen int) {
+	rf.mu.Lock()
+	rf.nextIndex[server] += logEntryLen
+	// 对于每一个服务器，已经复制给他的日志的最高索引值
+	rf.matchIndex[server] += logEntryLen
+	rf.mu.Unlock()
+
+}
+
 func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
-	fmt.Printf("###########broadcastAppendEntries == %+v\n", rf)
 	onceReturn := sync.Once{}
 	logEntryLen := len(logEntrys)
 	if logEntryLen == 0 {
 		DPrintf("[ERROR]: broadcastAppendEntries log is null.")
 	}
 	DPrintf("[STARTBROADCAST APPENDLOGS]: raft[%v](%v) Term(%v) broadcast AppendEntries Logs to other raft. Logs == %v.\n", rf.me, rf.state, rf.currentTerm, logEntrys)
-	rfLen := len(rf.peers)
 
-	DPrintf("logEntrys == %+v rf.logs == %+v \n", logEntrys, rf.logs)
 	// 如果当前rf.logs只有一条日志，则prevLogIndex == prevLogTerm ==0
-	lastAppend := logEntrys[len(logEntrys)-1]
-	preLog := rf.logs[lastAppend.Index-1]
+	first := logEntrys[0]
+	preLog := rf.logs[first.Index-1]
 
+	appendEntriesArgs := AppendEntriesArgs{
+		Term:         rf.currentTerm,
+		LeaderId:     rf.me,
+		Logs:         logEntrys,
+		PrevLogIndex: preLog.Index,   // 新的日志条目紧随之前的索引值.
+		PrevLogTerm:  preLog.Term,    // prevLogIndex 条目的任期号
+		LeaderCommit: rf.commitIndex, // leader’s commitIndex
+	}
+
+	rfLen := len(rf.peers)
 	var successNum int32 = 0
 	// 不需要给自己发送日志，因此初始化容量大小为rfLen-1
 	quorumCh := make(chan bool, rfLen-1)
@@ -576,42 +597,29 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
 			continue
 		}
 
-		appendEntriesArgs := AppendEntriesArgs{
-			Term:         rf.currentTerm,
-			LeaderId:     rf.me,
-			Logs:         logEntrys,
-			PrevLogIndex: preLog.Index,   // 新的日志条目紧随之前的索引值.
-			PrevLogTerm:  preLog.Term,    // prevLogIndex 条目的任期号
-			LeaderCommit: rf.commitIndex, // leader’s commitIndex
-		}
-
 		go func(server int) {
 			appendEntriesReply := &AppendEntriesReply{}
 		SENDAGAIN:
 			ok := rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
-			DPrintf("OK---- raft[%v] send to [%v] %+v %+v\n", rf.me, server, appendEntriesArgs, appendEntriesReply)
+			// DPrintf("OK---- raft[%v] send to [%v] %+v %+v\n", rf.me, server, appendEntriesArgs, appendEntriesReply)
 			// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
 			if appendEntriesReply.Term > rf.currentTerm {
 				rf.becomeFollower(appendEntriesReply.Term)
 				DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
 			}
 
-			if ok {
+			if ok { // true if follower contained entry matching prevLogIndex and prevLogTerm
 				if appendEntriesReply.Success {
 					// 领导人针对每一个跟随者维护了一个 nextIndex，这表示下一个需要发送给跟随者的日志条目的索引地址。
 					// 当一个领导人刚获得权力的时候，他初始化所有的 nextIndex 值为自己的最后一条日志的index加1（图 7 中的 11）。
 					// 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一）
-					rf.nextIndex[server] += logEntryLen
-					// 对于每一个服务器，已经复制给他的日志的最高索引值
-					rf.matchIndex[server] += logEntryLen
-					DPrintf("\n\n88888-----------%+v\n\n", rf)
+					rf.updateNextAndMatchIndex(server, logEntryLen)
 
 					addInt32 := atomic.AddInt32(&successNum, 1)
 					if int(addInt32) > len(rf.peers)/2 {
 						onceReturn.Do(func() {
-							DPrintf("[SUCCESS QUORUM　APPENDLOG] raft[%v](term=%v) append log to rf[%v] successNum(%v) peers(%v).", rf.me, rf.currentTerm, server, successNum, len(rf.peers))
+							// DPrintf("[SUCCESS QUORUM　APPENDLOG] raft[%v](term=%v) append log to rf[%v] successNum(%v) peers(%v).", rf.me, rf.currentTerm, server, successNum, len(rf.peers))
 							rf.commitIndex += logEntryLen
-							rf.applyLog()
 							quorumCh <- true
 						})
 					}
@@ -630,10 +638,20 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
 					// 最终 nextIndex 会在某个位置使得领导人和跟随者的日志达成一致。
 					// 当这种情况发生，附加日志 RPC 就会成功，这时就会把跟随者冲突的日志条目全部删除并且加上领导人的日志。
 					// 一旦附加日志 RPC 成功，那么跟随者的日志就会和领导人保持一致，并且在接下来的任期里一直继续保持。
-					fmt.Printf("error===============%v\n", server)
+					DPrintf("[APPENDLOG CONFLICTS] raft[%v](term=%v) append log to rf[%v] conficts.", rf.me, rf.currentTerm, server)
+					// 减少nextIndex，再次发送给follower
+					rf.nextIndex[server]--
+					appendLogs := []LogEntry{}
+					appendLogs = append(appendLogs, rf.logs[rf.nextIndex[server]])
+					appendLogs = append(appendLogs, logEntrys...)
+					appendEntriesArgs.Logs = appendLogs
+					appendEntriesArgs.PrevLogIndex--
+					appendEntriesArgs.PrevLogTerm = rf.logs[appendEntriesArgs.PrevLogIndex].Term
+					goto SENDAGAIN
+
 				}
 			} else {
-				// 如果失败，则重试，直到成功
+				// 如果超时失败，则重试，直到成功
 				DPrintf("如果失败，则重试，直到成功\n")
 				goto SENDAGAIN
 			}
@@ -800,7 +818,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.logs = []LogEntry{{Command: 0, Term: rf.currentTerm, Index: 0}}
 
 	rf.commitIndex = 0
-	rf.lastApplied = 0
+	// 忽略掉index=0，因为index=0数据为初始无意义数据
+	rf.lastApplied = 1
 
 	length := len(rf.peers)
 	rf.nextIndex = make([]int, length)
