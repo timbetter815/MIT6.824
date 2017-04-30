@@ -357,7 +357,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	// 在论文图8中有解释该不一致情况出现场景
 	// 此处一定能保证此处entries肯定不为空，为空则在心跳逻辑，return了，
 	// 且一定满足contained entry matching prevLogIndex and prevLogTerm
-	fmt.Printf("raft[%v]: 0-----rf.logs == %+v------------------\n", rf.me, rf.logs)
+	//fmt.Printf("raft[%v]: 0-----rf.logs == %+v------------------\n", rf.me, rf.logs)
 	logEntries := args.Logs
 	var newLogEntries = logEntries
 	if args.PrevLogIndex == rf.GetLastLogIndex() {
@@ -381,7 +381,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	// 4. Append any new entries not already in the log
 	rf.logs = append(rf.logs, newLogEntries...)
 
-	fmt.Printf("raft[%v]:%v-----rf.logs == %+v------------------\n", rf.me, 1, rf.logs)
+	//fmt.Printf("raft[%v]:1-----rf.logs == %+v------------------\n", rf.me, rf.logs)
 	// 5. If leaderCommit > commitIndex, set commitIndex =
 	// min(leaderCommit, index of last new entry)
 	if args.LeaderCommit > rf.commitIndex {
@@ -392,14 +392,18 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 			rf.commitIndex = args.LeaderCommit
 		}
 	}
-
-	/*atomic.AddInt32(&num, 1)
-	if int(num) == 3*len(rf.peers) {
-		panic("00000000000000")
-	}*/
+	rf.applyLog()
+	fmt.Printf("------------rf[%+v]\n", rf)
 }
 
-//var num int32 = 0
+// 如果commitIndex > lastApplied，那么就 lastApplied 加一，
+// 并把log[lastApplied]应用到状态机中（5.3 节）
+func (rf *Raft) applyLog() {
+	if rf.commitIndex > rf.lastApplied {
+		rf.lastApplied++
+		// TODO:
+	}
+}
 
 // AppendEntries send a RequestVote RPC to a server.添加日志条目，
 // Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).
@@ -435,7 +439,6 @@ func (rf *Raft) appendLog(command interface{}) {
 // the leader.
 // 询问Raft启动一个进程将命令添加到副本log中
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
-	DPrintf("[Start AGREEMENT]: raft[%v](%v) command == %v.\n", rf.me, rf.state, command)
 	index := -1
 	term := -1
 	isLeader := true
@@ -445,28 +448,26 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		isLeader = false
 		return index, term, isLeader
 	}
-	term = rf.currentTerm
+	DPrintf("[Start AGREEMENT]: raft[%v](%v) command == %v.\n", rf.me, rf.state, command)
 
 	rf.appendLog(command)
 
-	quorumLogCh := make(chan bool)
 	lastLogIndex := rf.GetLastLogIndex()
-	rf.broadcastAppendEntries(rf.logs[lastLogIndex:], quorumLogCh)
+	if rf.broadcastAppendEntries(rf.logs[lastLogIndex:]) {
+		DPrintf("[BROADCASTAPPENDLOG SUCCESS]: raft[%v] have a quorum append log success with term[%v], peers[%v].\n\n\n\n", rf.me, rf.currentTerm, len(rf.peers))
 
-	// 等待大多数日志被复制成功
-	<-quorumLogCh
-	DPrintf("[APPENDLOG SUCCESS]: raft[%v] have a quorum append log success with term[%v], peers[%v].\n", rf.me, term, len(rf.peers))
+		applyMsg := ApplyMsg{
+			Index:   rf.commitIndex,
+			Command: command}
 
-	applyMsg := ApplyMsg{
-		Index:   lastLogIndex,
-		Command: command}
-	applyMsg.Index = rf.commitIndex
+		go func(applyMsg ApplyMsg) {
+			rf.applyCh <- applyMsg
+		}(applyMsg)
+	}
 
-	go func(applyMsg ApplyMsg) {
-		rf.applyCh <- applyMsg
-	}(applyMsg)
-
-	index = lastLogIndex
+	index = rf.commitIndex
+	term = rf.currentTerm
+	fmt.Printf("-------------index==%v\n", index)
 	return index, term, isLeader
 }
 
@@ -522,7 +523,7 @@ func (rf*Raft) initNextAndMatchIndex() {
 		if index != rf.me {
 			nextLogIndex := rf.GetLastLogIndex() + 1
 			rf.nextIndex[index] = nextLogIndex // 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一）
-			rf.matchIndex[index] = 0           // 对于每一个服务器，已经复制给他的日志的最高索引值
+			// rf.matchIndex[index] = 0           // 对于每一个服务器，已经复制给他的日志的最高索引值
 		}
 	}
 }
@@ -551,11 +552,14 @@ func (rf *Raft) broadcastHeartbeat() {
 	}
 }
 
-func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool) {
-	if len(logEntrys) == 0 {
+func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
+	fmt.Printf("###########broadcastAppendEntries == %+v\n", rf)
+	onceReturn := sync.Once{}
+	logEntryLen := len(logEntrys)
+	if logEntryLen == 0 {
 		DPrintf("[ERROR]: broadcastAppendEntries log is null.")
 	}
-	DPrintf("[BROADCAST APPENDLOGS]: raft[%v](%v) Term(%v) broadcast AppendEntries Logs to other raft. Logs == %v.\n", rf.me, rf.state, rf.currentTerm, logEntrys)
+	DPrintf("[STARTBROADCAST APPENDLOGS]: raft[%v](%v) Term(%v) broadcast AppendEntries Logs to other raft. Logs == %v.\n", rf.me, rf.state, rf.currentTerm, logEntrys)
 	rfLen := len(rf.peers)
 
 	DPrintf("logEntrys == %+v rf.logs == %+v \n", logEntrys, rf.logs)
@@ -564,6 +568,8 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool)
 	preLog := rf.logs[lastAppend.Index-1]
 
 	var successNum int32 = 0
+	// 不需要给自己发送日志，因此初始化容量大小为rfLen-1
+	quorumCh := make(chan bool, rfLen-1)
 	for i := 0; i < rfLen; i++ {
 		if i == rf.me { // 不需要向自己发送心跳消息
 			atomic.AddInt32(&successNum, 1)
@@ -583,28 +589,48 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool)
 			appendEntriesReply := &AppendEntriesReply{}
 		SENDAGAIN:
 			ok := rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
-			DPrintf("OK---- send to [%v] %+v %+v\n", server, appendEntriesArgs, appendEntriesReply)
+			DPrintf("OK---- raft[%v] send to [%v] %+v %+v\n", rf.me, server, appendEntriesArgs, appendEntriesReply)
 			// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
 			if appendEntriesReply.Term > rf.currentTerm {
 				rf.becomeFollower(appendEntriesReply.Term)
 				DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
 			}
 
-			if ok && appendEntriesReply.Success {
-				// DPrintf("[APPENDLOG SUCCESS]: rf[%v] send log to rf[%v] success.\n", rf.me, server)
-				atomic.AddInt32(&successNum, 1)
-				if int(successNum) > len(rf.peers)/2 {
-					DPrintf("[SUCCESS QUORUM　APPENDLOG] raft[%v] append successNum(%v) peers(%v).", rf.me, successNum, len(rf.peers))
-					// 此处使用select的default来实现，判断chan是否已经塞满数据了
-					// 如果之前goroutine已经投票超过半数，则quorumCh<-true被执行过一次（则被塞满了数据，如果不使用default后续将一直阻塞）
-					// 使用default后，那么在后续执行quorumCh <- true时候，则会被阻塞，从来走default逻辑，达到不阻塞
-					select {
-					case quorumCh <- true:
-					default:
-						// 此处代表之间已经获取投票成功了，后续goroutine不能阻塞在quorumCh <- true，应该直接放过
-						return
-					}
+			if ok {
+				if appendEntriesReply.Success {
+					// 领导人针对每一个跟随者维护了一个 nextIndex，这表示下一个需要发送给跟随者的日志条目的索引地址。
+					// 当一个领导人刚获得权力的时候，他初始化所有的 nextIndex 值为自己的最后一条日志的index加1（图 7 中的 11）。
+					// 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一）
+					rf.nextIndex[server] += logEntryLen
+					// 对于每一个服务器，已经复制给他的日志的最高索引值
+					rf.matchIndex[server] += logEntryLen
+					DPrintf("\n\n88888-----------%+v\n\n", rf)
 
+					addInt32 := atomic.AddInt32(&successNum, 1)
+					if int(addInt32) > len(rf.peers)/2 {
+						onceReturn.Do(func() {
+							DPrintf("[SUCCESS QUORUM　APPENDLOG] raft[%v](term=%v) append log to rf[%v] successNum(%v) peers(%v).", rf.me, rf.currentTerm, server, successNum, len(rf.peers))
+							rf.commitIndex += logEntryLen
+							rf.applyLog()
+							quorumCh <- true
+						})
+					}
+				} else { // 附加日志失败，则说明对应跟随者，没有包含leader附加日志中的（prevLogIndex及prevLogTerm）
+					// 如果对于一个跟随者，最后日志条目的索引值大于等于 nextIndex，那么：发送从 nextIndex 开始的所有日志条目：
+					// 如果成功：更新相应跟随者的 nextIndex 和 matchIndex
+					// 如果因为日志不一致而失败，减少 nextIndex 重试
+					// 如果存在一个满足N > commitIndex的 N，并且大多数的matchIndex[i] ≥ N成立，并且log[N].term == currentTerm成立，
+					// 那么令 commitIndex 等于这个 N （5.3 和 5.4 节）
+					// 要使得跟随者的日志进入和自己一致的状态，领导人必须找到最后两者达成一致的地方，
+					// 然后删除从那个点之后的所有日志条目，发送自己的日志给跟随者。
+					// 所有的这些操作都在进行附加日志 RPCs 的一致性检查时完成。
+
+					// 如果一个跟随者的日志和领导人不一致，那么在下一次的附加日志 RPC 时的一致性检查就会失败。
+					// 在被跟随者拒绝之后，领导人就会减小 nextIndex 值并进行重试。
+					// 最终 nextIndex 会在某个位置使得领导人和跟随者的日志达成一致。
+					// 当这种情况发生，附加日志 RPC 就会成功，这时就会把跟随者冲突的日志条目全部删除并且加上领导人的日志。
+					// 一旦附加日志 RPC 成功，那么跟随者的日志就会和领导人保持一致，并且在接下来的任期里一直继续保持。
+					fmt.Printf("error===============%v\n", server)
 				}
 			} else {
 				// 如果失败，则重试，直到成功
@@ -613,7 +639,72 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry, quorumCh chan bool)
 			}
 		}(i)
 	}
+	return <-quorumCh
+}
 
+func doCancel(cancelChan chan struct{}) {
+	close(cancelChan)
+}
+
+func wasCanceled(cancelChan <-chan struct{}) bool {
+	select {
+	case <-cancelChan:
+		return true
+	default:
+		return false
+	}
+}
+
+func (rf *Raft) broadcastRequestVotes() bool {
+	requestVoteArgs := &RequestVoteArgs{
+		Term:         rf.currentTerm,
+		CandidateId:  rf.me,
+		LastLogIndex: rf.GetLastLogIndex(),
+		LastLogTerm:  rf.GetLastLogTerm()}
+	// 并行向其他服务器发送请求投票RPCs
+	var voteNum int32 = 0
+	rfLen := len(rf.peers)
+	quorumCh := make(chan bool, rfLen-1)
+	cancelCh := make(chan struct{})
+	onceCancel := sync.Once{}
+	for i := 0; i < rfLen; i++ {
+		if i == rf.me { // 不需要向自己发送请求投票RPCs
+			atomic.AddInt32(&voteNum, 1) // 给自己投票
+			continue
+		}
+		go func(server int) {
+			sendResult := false
+			if wasCanceled(cancelCh) {
+				return
+			}
+			requestVoteReply := &RequestVoteReply{}
+			ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
+			// 如果候选者从发送选举投票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+			if requestVoteReply.Term > rf.currentTerm {
+				DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] receive raft[%v] Term(%v) > self Term(%v).\n", rf.me, server, requestVoteReply.Term, rf.currentTerm)
+				rf.becomeFollower(requestVoteReply.Term)
+			}
+
+			if ok && requestVoteReply.VoteGranted {
+				if atomic.AddInt32(&voteNum, 1) > int32(len(rf.peers)/2) {
+					DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes[%v], term[%v], peers[%v].\n", rf.me, rf.currentTerm, atomic.LoadInt32(&voteNum), len(rf.peers))
+					// 当前已经获得大多数投票时，后续不需要继续投票，因此取消后续投票
+					onceCancel.Do(func() {
+						doCancel(cancelCh)
+					})
+					sendResult = true
+				}
+			}
+			quorumCh <- sendResult
+		}(i)
+	}
+	for i := 0; i < rfLen-1; i++ {
+		result := <-quorumCh
+		if result {
+			return true
+		}
+	}
+	return false
 }
 
 var markTime = time.Now()
@@ -641,48 +732,15 @@ func (rf *Raft) handleElection() {
 				DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] does not receive heartbeat %v.\n", rf.me, time.Now())
 			}
 		case StateCandidate:
-			var voteNum int32 = 0
-			requestVoteArgs := &RequestVoteArgs{
-				Term:         rf.currentTerm,
-				CandidateId:  rf.me,
-				LastLogIndex: rf.GetLastLogIndex(),
-				LastLogTerm:  rf.GetLastLogTerm()}
-			// 并行向其他服务器发送请求投票RPCs
-			rfLen := len(rf.peers)
-			quorumCh := make(chan bool)
+			electionTimeoutTicker := time.NewTicker(time.Duration(rf.randElectionTimeout) * time.Millisecond)
 
-			for i := 0; i < rfLen; i++ {
-				if i == rf.me { // 不需要向自己发送请求投票RPCs
-					atomic.AddInt32(&voteNum, 1) // 给自己投票
-					continue
-				}
-				go func(server int) {
-					requestVoteReply := &RequestVoteReply{}
-					ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
-					// 如果候选者从发送选举投票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
-					if requestVoteReply.Term > rf.currentTerm {
-						DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] receive raft[%v] Term(%v) > self Term(%v).\n", rf.me, server, requestVoteReply.Term, rf.currentTerm)
-						rf.becomeFollower(requestVoteReply.Term)
-					}
-
-					if ok && requestVoteReply.VoteGranted {
-						atomic.AddInt32(&voteNum, 1)
-						// 当获得超过半数选票时，立马切换为leader
-						if int(voteNum) > len(rf.peers)/2 {
-							// 此处使用select的default来实现，判断chan是否已经塞满数据了
-							// 如果之前goroutine已经投票超过半数，则quorumCh<-true被执行过一次（则被塞满了数据，如果不使用default后续将一直阻塞）
-							// 使用default后，那么在后续执行quorumCh <- true时候，则会被阻塞，从来走default逻辑，达到不阻塞
-							select {
-							case quorumCh <- true:
-								rf.becomeLeader()
-								DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes[%v], term[%v], peers[%v].\n", rf.me, voteNum, rf.currentTerm, len(rf.peers))
-							default:
-								// 此处代表之间已经获取投票成功了，后续goroutine不能阻塞在quorumCh <- true，应该直接放过
-								return
-							}
-						}
-					}
-				}(i)
+			votesResult := rf.broadcastRequestVotes()
+			// 如果当前获取大多数选票，那么则切换为leader，跳出循环
+			// 否则直接等待超时下一次选举
+			if votesResult {
+				// DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes, term[%v], peers[%v].\n", rf.me, rf.currentTerm, len(rf.peers))
+				rf.becomeLeader()
+				break
 			}
 
 			// 第三种可能的结果是候选人既没有赢得选举也没有输：如果有多个跟随者同时成为候选人，
@@ -693,12 +751,10 @@ func (rf *Raft) handleElection() {
 			// 为了阻止选票起初就被瓜分，选举超时时间是从一个固定的区间（例如 150-300毫秒）随机选择。
 			// 处理选举超时时间还未获取对应的quorum票数
 			select {
-			case <-quorumCh:
-				DPrintf("raft[%v] get quorum votes success.", rf.me)
 			case heartbeat := <-rf.heartbeatCh:
 				rf.printHeartBeatIntervalSeconds(1, heartbeat)
 				rf.becomeFollower(rf.currentTerm)
-			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
+			case <-electionTimeoutTicker.C:
 				// 超时进入下一轮选举
 				DPrintf("raft[%v] get quorum votes timeout, start next election.", rf.me)
 				rf.becomeCandidate()
