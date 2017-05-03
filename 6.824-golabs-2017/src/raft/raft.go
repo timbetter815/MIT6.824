@@ -197,7 +197,7 @@ type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
 	Term         int // 候选人的任期
-	CandidateId  int // 候选人id
+	CandidateId  int // 请求选票的候选人的 Id
 	LastLogIndex int // 候选人最后日志条目索引
 	LastLogTerm  int // 候选人最后日志条目任期
 }
@@ -223,15 +223,11 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// 接收选票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
 	if args.Term > rf.currentTerm {
 		DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive RequestVote other raft Term(%v) > self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
-		rf.mu.Lock()
-		rf.currentTerm = args.Term
-		rf.state = StateFollower
-		rf.votedFor = none
-		rf.mu.Unlock()
+		rf.becomeFollower(args.Term)
 	}
 
 	reply.Term = rf.currentTerm
-	// Reply false if term < currentTerm (§5.1)
+	// 1. Reply false if term < currentTerm (§5.1)
 	if args.Term < rf.currentTerm {
 		reply.VoteGranted = false
 		// DPrintf("** fails RequestVote  [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
@@ -239,22 +235,22 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	}
 
 	// 如果当前候选人votedFor为none 或者votedFor等于当前请求投票的候选人
-	// If votedFor is null or candidateId, and candidate’s log is at
+	// 2. If votedFor is null or candidateId, and candidate’s log is at
 	// least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
 	if (rf.votedFor == none || rf.votedFor == args.CandidateId) &&
 	//且当前请求投票的候选人的日志和rf的日志(至少)一样新，则投票
-		(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
+			(args.LastLogTerm >= rf.GetLastLogTerm() && args.LastLogIndex >= rf.GetLastLogIndex()) {
 		rf.mu.Lock()
 		rf.votedFor = args.CandidateId
 		rf.mu.Unlock()
 		reply.VoteGranted = true
 		DPrintf("[VOTEING]: success RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
 		return
-	} else {
-		// DPrintf("** fails else RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
-		reply.VoteGranted = false
-		return
 	}
+
+	// DPrintf("** fails else RequestVote [%v to %v term %v] args == %v reply==%v\n", rf.me, args.CandidateId, rf.currentTerm, args, reply)
+	reply.VoteGranted = false
+	return
 }
 
 //
@@ -324,8 +320,8 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		DPrintf("[rf=%+v] AppendEntries args.Term %v < rf.currentTerm %v\n", rf.me, args.Term, rf.currentTerm)
 		reply.Success = false
 		return
-	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term,且自己不为StateFollower时，则设置自己的Term，且切换为StateFollower
-		if rf.state != StateFollower || args.Term > rf.currentTerm {
+	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term, 则设置自己的Term，且切换为StateFollower
+		if args.Term > rf.currentTerm {
 			DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive AppendEntries other raft Term(%v) >= self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
 			rf.becomeFollower(args.Term)
 		}
@@ -340,11 +336,10 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 
 	// 2. Reply false if log doesn’t contain an entry at prevLogIndex
 	// whose term matches prevLogTerm (§5.3)
-	length := len(rf.logs)
-	if length < args.PrevLogIndex || rf.logs[args.PrevLogIndex].Term != args.PrevLogTerm {
+	if rf.GetLastLogIndex() < args.PrevLogIndex || rf.logs[args.PrevLogIndex].Term != args.PrevLogTerm {
 		reply.Success = false
 		return
-	} else {
+	} else if rf.logs[args.PrevLogIndex].Term == args.PrevLogTerm {
 		// true if follower contained entry matching
 		// prevLogIndex and prevLogTerm
 		reply.Success = true
@@ -356,20 +351,20 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	// 在论文图8中有解释该不一致情况出现场景
 	// 此处一定能保证此处entries肯定不为空，为空则在心跳逻辑，return了，
 	// 且一定满足contained entry matching prevLogIndex and prevLogTerm
-	//fmt.Printf("raft[%v]: 0-----rf.logs == %+v------------------\n", rf.me, rf.logs)
 	logEntries := args.Logs
 	var newLogEntries = logEntries
 	if args.PrevLogIndex == rf.GetLastLogIndex() {
 		newLogEntries = logEntries
 	} else { // args.PrevLogIndex < rf.GetLastLogIndex()
 		// 从prevLogIndex的后面一个开始验证
-		nowLogIndex := args.PrevLogIndex + 1
+		nowLogIndex := args.PrevLogIndex
 		for i := 0; i < len(logEntries); i++ {
 			// 如果有冲突
-			if nowLogIndex > rf.GetLastLogIndex() || rf.logs[nowLogIndex].Index == logEntries[i].Index && rf.logs[nowLogIndex].Term != logEntries[i].Term {
+			if nowLogIndex > rf.GetLastLogIndex() ||
+					(rf.logs[nowLogIndex].Index == logEntries[i].Index && rf.logs[nowLogIndex].Term != logEntries[i].Term) {
 				// 则删除rf.logs冲突及之后的所有数据
-				rf.logs = rf.logs[0: nowLogIndex-1]
-				// 提取为冲突需要append的新数据
+				rf.logs = rf.logs[0: nowLogIndex]
+				// 提取未冲突需要append的新数据
 				newLogEntries = logEntries[i:]
 				break
 			}
@@ -380,23 +375,23 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	// 4. Append any new entries not already in the log
 	rf.logs = append(rf.logs, newLogEntries...)
 
-	//fmt.Printf("raft[%v]:1-----rf.logs == %+v------------------\n", rf.me, rf.logs)
-	// 5. If leaderCommit > commitIndex, set commitIndex =
-	// min(leaderCommit, index of last new entry)
+	// 5. If leaderCommit > commitIndex,
+	// set commitIndex = min(leaderCommit, index of last new entry)
 	if args.LeaderCommit > rf.commitIndex {
-		index1 := logEntries[len(logEntries)-1].Index
-		if index1 < args.LeaderCommit {
-			rf.commitIndex = index1
+		lastLogIndex := rf.GetLastLogIndex()
+		if lastLogIndex < args.LeaderCommit {
+			rf.commitIndex = lastLogIndex
 		} else {
 			rf.commitIndex = args.LeaderCommit
 		}
-		go rf.applyLog()
+		// 异步应用日志到状态机
+		go rf.applyLogToStateMachine()
 	}
 }
 
 // 如果commitIndex > lastApplied，那么就 lastApplied 加一，
 // 并把log[lastApplied]应用到状态机中（5.3 节）
-func (rf *Raft) applyLog() {
+func (rf *Raft) applyLogToStateMachine() {
 	for rf.commitIndex >= rf.lastApplied {
 		log := rf.logs[rf.lastApplied]
 		// TODO: log应用到状态机中
@@ -467,7 +462,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		if rf.broadcastAppendEntries(entries) {
 			DPrintf("[BROADCASTAPPENDLOG SUCCESS]: raft[%v] have a quorum append log[%+v] success with term[%v], peers[%v].\n\n", rf.me, entries, rf.currentTerm, len(rf.peers))
 			rf.nextIndex[rf.me] += len(entries)
-			go rf.applyLog()
+			go rf.applyLogToStateMachine()
 		}
 	}(command)
 
@@ -500,7 +495,7 @@ func (rf*Raft) becomeFollower(term int) {
 	rf.mu.Lock()
 	rf.currentTerm = term
 	rf.state = StateFollower
-	// rf.votedFor = none
+	rf.votedFor = none
 	rf.mu.Unlock()
 }
 
@@ -796,7 +791,7 @@ func (rf *Raft) handleElection() {
 // for any long-running work.
 //
 func Make(peers []*labrpc.ClientEnd, me int,
-	persister *Persister, applyCh chan ApplyMsg) *Raft {
+		persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister

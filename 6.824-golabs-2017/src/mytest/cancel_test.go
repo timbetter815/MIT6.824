@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+var exeNum int32 = 0
+
 func Test_cancel(t *testing.T) {
 	for index := 0; index < 10; index++ {
 		ok := broadcastVoteWithCancel()
@@ -44,6 +46,7 @@ func broadcastVoteWithCancel() (bool) {
 				fmt.Printf("now[%v]: wasCancelled.\n", time.Now())
 				return
 			} else {
+				fmt.Printf("exeNum == %v\n", atomic.AddInt32(&exeNum, 1))
 				ok := getRequestVote1(server)
 				if ok {
 					if atomic.AddInt32(&successNum, 1) > MaxServer/2 {
@@ -74,7 +77,7 @@ func getRequestVote1(server int) bool {
 	if server == MaxServer-2 {
 		time.Sleep(1 * time.Second)
 	}
-	// 模拟一半的几率失败
+	// 模拟1/5的几率失败
 	intn := rand.Intn(2)
 	if intn == 0 {
 		return false
