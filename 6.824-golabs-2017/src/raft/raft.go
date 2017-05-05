@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 	"math/rand"
+	"golang.org/x/tools/present"
 )
 
 // import "bytes"
@@ -213,20 +214,25 @@ type RequestVoteReply struct {
 	VoteGranted bool // true代表候选人接收到选票
 }
 
+// compareTermAndBecomeFollower 如果term大于rf的currentTerm，则设置currentTerm为term，且切换为跟随者
+// If RPC request or response contains term T > currentTerm:
+// set currentTerm = T, convert to follower (§5.1)
+func (rf *Raft) compareTermAndBecomeFollower(term int) {
+	if term > rf.currentTerm {
+		DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive other raft Term(%v) > self Term(%v).\n", rf.me, term, rf.currentTerm)
+		rf.becomeFollower(term)
+	}
+}
+
 //
 // example RequestVote RPC handler.
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	//DPrintf("## RequestVote start %+v , args == %+v replay == %+v\n", rf, args, reply)
 	// Your code here (2A, 2B).
 
-	// 接收选票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
-	if args.Term > rf.currentTerm {
-		DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive RequestVote other raft Term(%v) > self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
-		rf.becomeFollower(args.Term)
-	}
-
 	reply.Term = rf.currentTerm
+	rf.compareTermAndBecomeFollower(args.Term)
+
 	// 1. Reply false if term < currentTerm (§5.1)
 	if args.Term < rf.currentTerm {
 		reply.VoteGranted = false
@@ -281,7 +287,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 // capitalized all field names in structs passed over RPC, and
 // that the caller passes the address of the reply struct with &, not
 // the struct itself.
-//
+// ok == false 代表超时无反馈
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	return ok
@@ -320,11 +326,10 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		DPrintf("[rf=%+v] AppendEntries args.Term %v < rf.currentTerm %v\n", rf.me, args.Term, rf.currentTerm)
 		reply.Success = false
 		return
-	} else { // 接收RPC日志时候，发现对方的Term大于等于自己Term, 则设置自己的Term，且切换为StateFollower
-		if args.Term > rf.currentTerm {
-			DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive AppendEntries other raft Term(%v) >= self Term(%v).\n", rf.me, args.Term, rf.currentTerm)
-			rf.becomeFollower(args.Term)
-		}
+	} else {
+		// Candidates (§5.2): If AppendEntries RPC received from new leader: convert to follower
+		// 接收RPC日志时候，发现对方的Term大于等于自己Term, 则设置自己的Term，且切换为StateFollower
+		rf.compareTermAndBecomeFollower(args.Term)
 	}
 
 	// 如果Entries为空，则表示心跳信息
@@ -389,12 +394,16 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	}
 }
 
+// For All Servers: If commitIndex > lastApplied: increment lastApplied, apply
+// log[lastApplied] to state machine (§5.3)
 // 如果commitIndex > lastApplied，那么就 lastApplied 加一，
 // 并把log[lastApplied]应用到状态机中（5.3 节）
 func (rf *Raft) applyLogToStateMachine() {
 	for rf.commitIndex >= rf.lastApplied {
 		log := rf.logs[rf.lastApplied]
 		// TODO: log应用到状态机中
+		// If command received from client: append entry to local log,
+		// respond after entry applied to state machine (§5.3)
 		applyMsg := ApplyMsg{
 			Index:   log.Index,
 			Command: log.Command}
@@ -414,12 +423,6 @@ func (rf *Raft) applyLogToStateMachine() {
 func (rf *Raft) sendAppendEntries(server int, args AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
 	return ok
-}
-
-func (rf *Raft) appendLog(logEntry LogEntry) {
-	rf.mu.Lock()
-	rf.logs = append(rf.logs, logEntry)
-	rf.mu.Unlock()
 }
 
 //
@@ -454,14 +457,19 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 			Term:    rf.currentTerm,
 		}
 
-		rf.appendLog(logEntry)
+		// If command received from client: append entry to local log,
+		rf.logs = append(rf.logs, logEntry)
 
-		//lastLogIndex := rf.GetLastLogIndex()
-		// 		if rf.broadcastAppendEntries(rf.logs[lastLogIndex:]) {
+		// If last log index ≥ nextIndex for a follower:
+		// send AppendEntries RPC with log entries starting at nextIndex
+		// • If successful: update nextIndex and matchIndex for follower (§5.3)
+		// • If AppendEntries fails because of log inconsistency: decrement nextIndex and retry (§5.3)
 		entries := []LogEntry{logEntry}
 		if rf.broadcastAppendEntries(entries) {
 			DPrintf("[BROADCASTAPPENDLOG SUCCESS]: raft[%v] have a quorum append log[%+v] success with term[%v], peers[%v].\n\n", rf.me, entries, rf.currentTerm, len(rf.peers))
-			rf.nextIndex[rf.me] += len(entries)
+			// TODO: ??? rf.nextIndex[rf.me] += len(entries)
+			// When the entry has been safely replicated (as described below),
+			// the leader applies the entry to its state machine and returns the result of that execution to the client.
 			go rf.applyLogToStateMachine()
 		}
 	}(command)
@@ -542,11 +550,11 @@ func (rf *Raft) broadcastHeartbeat() {
 
 		go func(server int) {
 			appendEntriesReply := &AppendEntriesReply{}
-			rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
-			// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
-			if appendEntriesReply.Term > rf.currentTerm {
-				rf.becomeFollower(appendEntriesReply.Term)
-				DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
+			ok := rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
+			// ok == false 代表超时无反馈
+			if ok {
+				// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+				rf.compareTermAndBecomeFollower(appendEntriesReply.Term)
 			}
 		}(i)
 	}
@@ -592,19 +600,19 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
 			continue
 		}
 
+		// The leader appends the command to its log as a new entry,
+		// then issues AppendEntries RPCs in parallel to each of the other servers to replicate the entry.
 		go func(server int) {
 			appendEntriesReply := &AppendEntriesReply{}
 		SENDAGAIN:
-			ok := rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply)
+			ok := rf.sendAppendEntries(server, appendEntriesArgs, appendEntriesReply) // ok == false 代表超时无反馈
 			// DPrintf("OK---- raft[%v] send to [%v] %+v %+v\n", rf.me, server, appendEntriesArgs, appendEntriesReply)
-			// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
-			if appendEntriesReply.Term > rf.currentTerm {
-				rf.becomeFollower(appendEntriesReply.Term)
-				DPrintf("[SWITCHSTATE: ->StateFollower]: raft[%v] receive raft[%v] Term(%v) > self Term(%v), and switch to StateFollower.\n", rf.me, server, appendEntriesReply.Term, rf.currentTerm)
-			}
 
-			if ok { // true if follower contained entry matching prevLogIndex and prevLogTerm
-				if appendEntriesReply.Success {
+			if ok {
+				// 如果领导者发送心跳时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+				rf.compareTermAndBecomeFollower(appendEntriesReply.Term)
+
+				if appendEntriesReply.Success { // true if follower contained entry matching prevLogIndex and prevLogTerm
 					// 领导人针对每一个跟随者维护了一个 nextIndex，这表示下一个需要发送给跟随者的日志条目的索引地址。
 					// 当一个领导人刚获得权力的时候，他初始化所有的 nextIndex 值为自己的最后一条日志的index加1（图 7 中的 11）。
 					// 对于每一个服务器，需要发送给他的下一个日志条目的索引值（初始化为领导人最后索引值加一）
@@ -646,7 +654,9 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
 
 				}
 			} else {
-				// 如果超时失败，则重试，直到成功
+				// If followers crash or run slowly, or if network packets are lost,
+				// the leader retries AppendEntries RPCs indefinitely (even after it has responded to the client)
+				// until all followers eventually store all log entries.
 				DPrintf("如果失败，则重试，直到成功\n")
 				goto SENDAGAIN
 			}
@@ -655,10 +665,12 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
 	return <-quorumCh
 }
 
+// 取消后续任务的执行
 func doCancel(cancelChan chan struct{}) {
 	close(cancelChan)
 }
 
+// 判断后续需要执行的任务是否被取消
 func wasCanceled(cancelChan <-chan struct{}) bool {
 	select {
 	case <-cancelChan:
@@ -682,9 +694,11 @@ func (rf *Raft) broadcastRequestVotes() bool {
 	onceCancel := sync.Once{}
 	for i := 0; i < rfLen; i++ {
 		if i == rf.me { // 不需要向自己发送请求投票RPCs
-			atomic.AddInt32(&voteNum, 1) // 给自己投票
+			atomic.AddInt32(&voteNum, 1) // 给自己投票(rf.votedFor = rf.me在becomeCanidate函数已经完成)
 			continue
 		}
+		// 并发向其他服务器开启投票
+		// 当获取到半数以上的票时，则已经当选，取消后续获取投票任务
 		go func(server int) {
 			sendResult := false
 			if wasCanceled(cancelCh) {
@@ -692,25 +706,27 @@ func (rf *Raft) broadcastRequestVotes() bool {
 			}
 			requestVoteReply := &RequestVoteReply{}
 			ok := rf.sendRequestVote(server, requestVoteArgs, requestVoteReply)
-			// 如果候选者从发送选举投票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
-			if requestVoteReply.Term > rf.currentTerm {
-				DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] receive raft[%v] Term(%v) > self Term(%v).\n", rf.me, server, requestVoteReply.Term, rf.currentTerm)
-				rf.becomeFollower(requestVoteReply.Term)
-			}
 
-			if ok && requestVoteReply.VoteGranted {
-				if atomic.AddInt32(&voteNum, 1) > int32(len(rf.peers)/2) {
-					DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes[%v], term[%v], peers[%v].\n", rf.me, rf.currentTerm, atomic.LoadInt32(&voteNum), len(rf.peers))
-					// 当前已经获得大多数投票时，后续不需要继续投票，因此取消后续投票
-					onceCancel.Do(func() {
-						doCancel(cancelCh)
-					})
-					sendResult = true
+			if ok { // ok == false 代表超时无反馈
+				// 如果候选者从发送选举投票时候，发现对方的Term大于自己Term,则设置自己的Term，且切换为StateFollower
+				rf.compareTermAndBecomeFollower(requestVoteReply.Term)
+
+				if requestVoteReply.VoteGranted {
+					if atomic.AddInt32(&voteNum, 1) > int32(len(rf.peers)/2) {
+						DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes[%v], term[%v], peers[%v].\n", rf.me, rf.currentTerm, atomic.LoadInt32(&voteNum), len(rf.peers))
+						// 当前已经获得大多数投票时，后续不需要继续投票，因此取消后续投票
+						onceCancel.Do(func() {
+							doCancel(cancelCh)
+						})
+						sendResult = true
+					}
 				}
 			}
 			quorumCh <- sendResult
 		}(i)
 	}
+
+	// 阻塞等待投票半数以上
 	for i := 0; i < rfLen-1; i++ {
 		result := <-quorumCh
 		if result {
@@ -747,10 +763,10 @@ func (rf *Raft) handleElection() {
 		case StateCandidate:
 			electionTimeoutTicker := time.NewTicker(time.Duration(rf.randElectionTimeout) * time.Millisecond)
 
-			votesResult := rf.broadcastRequestVotes()
+			voteSuccess := rf.broadcastRequestVotes()
 			// 如果当前获取大多数选票，那么则切换为leader，跳出循环
 			// 否则直接等待超时下一次选举
-			if votesResult {
+			if voteSuccess {
 				// DPrintf("[SWITCHSTATE: ->StateLeader]: raft[%v] has gather majority votes, term[%v], peers[%v].\n", rf.me, rf.currentTerm, len(rf.peers))
 				rf.becomeLeader()
 				break
@@ -773,6 +789,8 @@ func (rf *Raft) handleElection() {
 				rf.becomeCandidate()
 			}
 		case StateLeader:
+			// Leaders: Upon election: send initial empty AppendEntries RPCs
+			// (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
 			rf.broadcastHeartbeat()
 			time.Sleep(time.Duration(rf.heartbeatBroadcastTime) * time.Millisecond)
 		}
