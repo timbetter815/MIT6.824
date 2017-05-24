@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 	"time"
 	"math/rand"
-	"golang.org/x/tools/present"
 )
 
 // import "bytes"
