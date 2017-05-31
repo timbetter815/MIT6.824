@@ -61,11 +61,11 @@ const (
 	// candidate and start an election. ElectionTick must be greater than
 	// HeartbeatTick. We suggest ElectionTick = 10 * HeartbeatTick to avoid
 	// unnecessary leader switching.
-	ElectionTimeoutTick int = 400
+	ElectionTimeoutTick int = 10
 	// HeartbeatTick is the number of Node.Tick invocations that must pass between
 	// heartbeats. That is, a leader sends heartbeat messages to maintain its
 	// leadership every HeartbeatTick ticks.
-	HeartbeatBroadcastTick int = 100
+	HeartbeatBroadcastTick int = 5
 )
 
 // 增加Raft的state Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/28
@@ -103,7 +103,7 @@ type Raft struct {
 	// Persistent state on all servers:(Updated on stable storage before responding to RPCs)
 	currentTerm int        // 任期（第一次启动初始化为0，后续单调递增）
 	votedFor    int        // 当前任期接收选票的候选人id(如果没有则设置为none，用常量-1代替)
-	logs        []LogEntry //log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
+	logs        []LogEntry //log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1 即：logs[0].Index == 1)
 
 	// Volatile state on all servers:
 	commitIndex int // index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -129,8 +129,11 @@ type Raft struct {
 // Author: tantexian, <my.oschina.net/tantexian>
 // Since: 2017/3/28
 func (rf *Raft) GetLastLogTerm() (term int) {
-	len := len(rf.logs)
-	term = rf.logs[len-1].Term
+	length := len(rf.logs)
+	if length == 0 {
+		return 0
+	}
+	term = rf.logs[length-1].Term
 	return term
 }
 
@@ -139,8 +142,12 @@ func (rf *Raft) GetLastLogTerm() (term int) {
 // Since: 2017/3/28
 func (rf *Raft) GetLastLogIndex() (index int) {
 	// log的长度即为index，因为index从1开始，如果为空[],则index为0
-	len := len(rf.logs) - 1
-	return len
+	length := len(rf.logs)
+	if length == 0 {
+		return 0
+	}
+	index = rf.logs[length-1].Index
+	return index
 }
 
 // return currentTerm and whether this server
@@ -336,11 +343,17 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 		// DPrintf("send heartbeat to %v\n", rf.me)
 		rf.heartbeatCh <- time.Now().String()
 		return // TODO：心跳信息则直接返回？
+	} else {
+		// 如果是附加日志，也应该当做是一次心跳信息？
+		rf.heartbeatCh <- time.Now().String()
 	}
+
+	logEntries := args.Logs
 
 	// 2. Reply false if log doesn’t contain an entry at prevLogIndex
 	// whose term matches prevLogTerm (§5.3)
 	if rf.GetLastLogIndex() < args.PrevLogIndex || rf.logs[args.PrevLogIndex].Term != args.PrevLogTerm {
+		DPrintf("ERROR: Doesn’t contain pre Entries: rf[%v] rf.logs == %v appendLogs == %v", rf.me, rf.logs, logEntries)
 		reply.Success = false
 		return
 	} else if rf.logs[args.PrevLogIndex].Term == args.PrevLogTerm {
@@ -355,12 +368,12 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	// 在论文图8中有解释该不一致情况出现场景
 	// 此处一定能保证此处entries肯定不为空，为空则在心跳逻辑，return了，
 	// 且一定满足contained entry matching prevLogIndex and prevLogTerm
-	logEntries := args.Logs
 	var newLogEntries = logEntries
 	if args.PrevLogIndex == rf.GetLastLogIndex() {
 		newLogEntries = logEntries
 	} else { // args.PrevLogIndex < rf.GetLastLogIndex()
 		// 从prevLogIndex的后面一个开始验证
+		DPrintf("ERROR: Conflicts Entries: rf[%v] rf.logs == %v appendLogs == %v", rf.me, rf.logs, logEntries)
 		nowLogIndex := args.PrevLogIndex
 		for i := 0; i < len(logEntries); i++ {
 			// 如果有冲突
@@ -398,7 +411,10 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 // 如果commitIndex > lastApplied，那么就 lastApplied 加一，
 // 并把log[lastApplied]应用到状态机中（5.3 节）
 func (rf *Raft) applyLogToStateMachine() {
-	for rf.commitIndex >= rf.lastApplied {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	for rf.commitIndex > rf.lastApplied {
 		log := rf.logs[rf.lastApplied]
 		// TODO: log应用到状态机中
 		// If command received from client: append entry to local log,
@@ -407,10 +423,10 @@ func (rf *Raft) applyLogToStateMachine() {
 			Index:   log.Index,
 			Command: log.Command}
 
-		rf.applyCh <- applyMsg
-		rf.mu.Lock()
+		go func() {
+			rf.applyCh <- applyMsg
+		}()
 		rf.lastApplied++
-		rf.mu.Unlock()
 	}
 }
 
@@ -509,9 +525,9 @@ func (rf*Raft) becomeFollower(term int) {
 func (rf*Raft) becomeCandidate() {
 	rf.mu.Lock()
 	rf.state = StateCandidate
-	rf.votedFor = rf.me
 	// 任期加1
 	rf.currentTerm++
+	rf.votedFor = rf.me
 	rf.resetRandElectionTimeout()
 	rf.mu.Unlock()
 }
@@ -622,6 +638,7 @@ func (rf *Raft) broadcastAppendEntries(logEntrys []LogEntry) bool {
 						onceReturn.Do(func() {
 							// DPrintf("[SUCCESS QUORUM　APPENDLOG] raft[%v](term=%v) append log to rf[%v] successNum(%v) peers(%v).", rf.me, rf.currentTerm, server, successNum, len(rf.peers))
 							rf.commitIndex += logEntryLen
+							go rf.applyLogToStateMachine()
 							quorumCh <- true
 						})
 					}
@@ -720,6 +737,8 @@ func (rf *Raft) broadcastRequestVotes() bool {
 						sendResult = true
 					}
 				}
+			} else {
+				DPrintf("[RequestVote TimeOut]: raft[%v] requestVote server[%v] with term[%v] timeout.\n", rf.me, server, rf.currentTerm)
 			}
 			quorumCh <- sendResult
 		}(i)
@@ -753,15 +772,12 @@ func (rf *Raft) handleElection() {
 			select {
 			case heartbeat := <-rf.heartbeatCh:
 				rf.printHeartBeatIntervalSeconds(1, heartbeat)
-
-			// 如果超过随机超时时间（随机）未收到心跳信息，则切换状态为候选人
+				// 如果超过随机超时时间（随机）未收到心跳信息，则切换状态为候选人
 			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
 				rf.becomeCandidate()
 				DPrintf("[SWITCHSTATE: ->StateCandidate]: raft[%v] does not receive heartbeat %v.\n", rf.me, time.Now())
 			}
 		case StateCandidate:
-			electionTimeoutTicker := time.NewTicker(time.Duration(rf.randElectionTimeout) * time.Millisecond)
-
 			voteSuccess := rf.broadcastRequestVotes()
 			// 如果当前获取大多数选票，那么则切换为leader，跳出循环
 			// 否则直接等待超时下一次选举
@@ -782,10 +798,10 @@ func (rf *Raft) handleElection() {
 			case heartbeat := <-rf.heartbeatCh:
 				rf.printHeartBeatIntervalSeconds(1, heartbeat)
 				rf.becomeFollower(rf.currentTerm)
-			case <-electionTimeoutTicker.C:
+			case <-time.After(time.Duration(rf.randElectionTimeout) * time.Millisecond):
+				rf.becomeCandidate()
 				// 超时进入下一轮选举
 				DPrintf("raft[%v] get quorum votes timeout, start next election.", rf.me)
-				rf.becomeCandidate()
 			}
 		case StateLeader:
 			// Leaders: Upon election: send initial empty AppendEntries RPCs
@@ -817,7 +833,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	// Your initialization code here (2A, 2B, 2C).
 	// Add: tantexian, <my.oschina.net/tantexian> Since: 2017/3/27
 	rf.applyCh = applyCh
-	rf.heartbeatCh = make(chan string)
+	rf.heartbeatCh = make(chan string, 1) // 发送完心跳立马返回，因此缓存大小设置为1
 	rf.heartbeatBroadcastTime = HeartbeatBroadcastTick
 	//rf.heartbeatTimeOut = HeartbeatTimeOutTick
 	rf.electionTimeout = ElectionTimeoutTick
@@ -827,11 +843,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.currentTerm = 0
 	rf.votedFor = none
 	// 初始化log的第一个元素的term及index都为0
-	rf.logs = []LogEntry{{Command: 0, Term: rf.currentTerm, Index: 0}}
+	//rf.logs = []LogEntry{{Command: 0, Term: rf.currentTerm, Index: 0}}
+	rf.logs = []LogEntry{}
 
 	rf.commitIndex = 0
-	// 忽略掉index=0，因为index=0数据为初始无意义数据
-	rf.lastApplied = 1
+	rf.lastApplied = 0
 
 	length := len(rf.peers)
 	rf.nextIndex = make([]int, length)
