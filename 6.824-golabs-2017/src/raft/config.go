@@ -333,6 +333,7 @@ func (cfg *config) nCommitted(index int) (int, interface{}) {
 
 		cfg.mu.Lock()
 		cmd1, ok := cfg.logs[i][index]
+		//fmt.Printf("\n[%v]---- cfg.logs[%v] == %v\n",time.Now(), i, cfg.logs)
 		cfg.mu.Unlock()
 
 		if ok {
@@ -401,6 +402,7 @@ func (cfg *config) one(cmd int, expectedServers int) int {
 			}
 			cfg.mu.Unlock()
 			if rf != nil {
+				// 获取leader当前的index
 				index1, _, ok := rf.Start(cmd)
 				if ok {
 					index = index1
@@ -415,6 +417,7 @@ func (cfg *config) one(cmd int, expectedServers int) int {
 			t1 := time.Now()
 			for time.Since(t1).Seconds() < 2 {
 				nd, cmd1 := cfg.nCommitted(index)
+				//DPrintf("\n--------- index == %v nd == %v cmd1 == %v\n", index, nd, cmd1)
 				if nd > 0 && nd >= expectedServers {
 					// committed
 					if cmd2, ok := cmd1.(int); ok && cmd2 == cmd {
